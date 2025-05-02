@@ -1,12 +1,12 @@
-streamlit==1.30.0
-pandas==2.1.4
-numpy==1.26.3
-matplotlib==3.8.2
-seaborn==0.13.1
-yfinance==0.2.35
-scikit-learn==1.4.0
-tensorflow==2.15.0
-xgboost==2.0.3
-statsmodels==0.14.1
+streamlit
+pandas
+numpy
+matplotlib
+seaborn
+yfinance
+scikit-learn
+tensorflow
+xgboost
+statsmodels
 # Optional packages (comment out if causing issues)
-# pmdarima==2.0.4
+# pmdarima
