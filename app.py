@@ -11,20 +11,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
-import requests
-import io
-from urllib.request import urlopen
-import ssl
-import base64
-
 import warnings
 warnings.filterwarnings('ignore')
 
+# Try to import required modules with fallbacks
+try:
+    from StockPrediction import StockModelComparison
+    from nifty_50_analyzer import Nifty50Analyzer
+except ImportError as e:
+    st.error(f"Error importing modules: {str(e)}")
+    st.info("Some dependencies might be missing. Please check the requirements.txt file.")
+    import sys
+    st.write(f"Python version: {sys.version}")
+    st.stop()
 
-
-# Import your classes
-from StockPrediction import StockModelComparison
-from nifty_50_analyzer import Nifty50Analyzer
 
 # Set page configuration
 st.set_page_config(
