@@ -131,7 +131,7 @@ class StockModelComparison:
         """Download stock data and prepare initial DataFrame"""
         print(f"📥 Downloading data for {self.ticker}...")
         
-        self.stock_data = yf.download(self.ticker, start=self.start_date, end=self.end_date, threads=False))
+        self.stock_data = yf.download(self.ticker, start=self.start_date, end=self.end_date, threads=False)
 
         try:
             if len(self.stock_data)==0:
@@ -139,11 +139,11 @@ class StockModelComparison:
                 if self.ticker.endswith('.NS'):
                     # Try without the .NS extension
                     base_ticker = self.ticker.replace('.NS', '')
-                    self.stock_data = yf.download(f"{base_ticker}.NS", start=self.start_date, end=self.end_date, threads=False))
+                    self.stock_data = yf.download(f"{base_ticker}.NS", start=self.start_date, end=self.end_date, threads=False)
                     
                     # If still no data, try with BSE extension
                     if len(self.stock_data) == 0:
-                        self.stock_data = yf.download(f"{base_ticker}.BO", start=self.start_date, end=self.end_dat, threads=False)e)
+                        self.stock_data = yf.download(f"{base_ticker}.BO", start=self.start_date, end=self.end_date, threads=False)
                     
         except Exception:
             raise ValueError(f"No data found for ticker {self.ticker}. Please check the ticker symbol.")
