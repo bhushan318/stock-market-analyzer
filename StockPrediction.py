@@ -130,7 +130,24 @@ class StockModelComparison:
     def download_data(self):
         """Download stock data and prepare initial DataFrame"""
         print(f"📥 Downloading data for {self.ticker}...")
-        self.stock_data = yf.download(self.ticker, start=self.start_date, end=self.end_date)
+        
+        
+        if len(self.stock_data) == 0:
+            # For Indian stocks, try alternative methods
+            if self.ticker.endswith('.NS'):
+                # Try without the .NS extension
+                base_ticker = self.ticker.replace('.NS', '')
+                self.stock_data = yf.download(f"{base_ticker}.NS", start=self.start_date, end=self.end_date)
+                
+                # If still no data, try with BSE extension
+                if len(self.stock_data) == 0:
+                    self.stock_data = yf.download(f"{base_ticker}.BO", start=self.start_date, end=self.end_date)
+            
+            # If still no data, raise error
+            if len(self.stock_data) == 0:
+                raise ValueError(f"No data found for ticker {self.ticker}. Please check the ticker symbol.")
+
+        # self.stock_data = yf.download(self.ticker, start=self.start_date, end=self.end_date)
         
         if len(self.stock_data) == 0:
             raise ValueError(f"No data found for ticker {self.ticker}. Please check the ticker symbol.")
