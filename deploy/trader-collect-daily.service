@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect NSE end-of-day data (bhavcopy + delivery, bulk/block deals, FII/DII)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/stock-market-analyzer
+ExecStart=%h/stock-market-analyzer/.venv/bin/python -m trader collect daily
+TimeoutStartSec=30min

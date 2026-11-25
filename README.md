@@ -63,6 +63,28 @@ fall freezes money under the no-loss rule; seasonality did not repeat out of sam
   Walk-forward predictions are cached, so `backtest` is fast afterwards.
 - Outputs (trade log, equity curve, open positions) go to `outputs/`.
 
+## Data collection on the Pi (Phase 1)
+
+Free, official NSE files collected into one SQLite file (`data/market.db`):
+
+| Table | Source | When |
+|---|---|---|
+| `eq_daily` | Full bhavcopy: OHLC, volume, **delivery %** (Nifty 500 + all NSE ETFs) | weekdays 19:30 IST, catches up missed days |
+| `deals` | Bulk and block deals | weekdays 19:30 IST |
+| `fii_dii` | FII/FPI and DII cash-market flows | weekdays 19:30 IST (only today's figure is published, so start early) |
+| `announcements` | Corporate announcements + financial results RSS, matched to symbols | hourly 07:00-23:00 IST |
+
+```bash
+.venv/bin/python -m trader collect daily       # run once by hand to check
+.venv/bin/python -m trader collect news
+.venv/bin/python -m trader collect status      # row counts, last runs, recent errors
+nohup .venv/bin/python -m trader collect backfill --start 2020-01-01 > backfill.log 2>&1 &   # ~1 hour, once
+bash deploy/install.sh                         # install the systemd timers (repo must be at ~/stock-market-analyzer)
+```
+
+Holidays are detected automatically (NSE re-publishes the previous day's file on holidays).
+News and FII/DII history cannot be downloaded later, so the timers should run from day one.
+
 ## Reading the backtest
 
 Each column is one variant of the rules; rows include:
@@ -102,7 +124,7 @@ no transaction costs, and the default test window was one month.
 
 1. ✅ Engine: data, features, walk-forward model, cost-aware backtest, tests.
 2. ⬜ Model tuned for the chosen exit rules (e.g. prefer steady low-volatility stocks).
-3. ⬜ Paper-trading pipeline on the Pi: SQLite state, paper broker, 07:30 / 09:20 / 15:45
+3. 🔄 Data collectors on the Pi (done: NSE prices + delivery, deals, FII/DII, announcements). Next: paper-trading pipeline: SQLite state, paper broker, 07:30 / 09:20 / 15:45
    systemd timers, Telegram alerts, several strategy variants run side by side.
 4. ⬜ News veto (log-only during paper trading).
 5. ⬜ Zerodha Kite broker (CNC only, GTT target/stop orders, hard capital and order limits),

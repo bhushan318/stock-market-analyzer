@@ -101,3 +101,8 @@ backtest:
   random_baseline_runs: 20   # same rules, random picks - shows whether the model adds value
   stuck_days: 60             # a position held this long and still underwater counts as "stuck"
   output_dir: outputs
+
+collect:                     # NSE data collectors (python -m trader collect ...)
+  db_path: data/market.db
+  store_all: false           # false = Nifty 500 + all NSE ETFs + extra_symbols (keeps the DB small)
+  extra_symbols: []

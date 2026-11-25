@@ -1,0 +1,9 @@
+[Unit]
+Description=NSE announcements: every hour 07:00-23:00 IST
+
+[Timer]
+OnCalendar=*-*-* 07..23:05 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

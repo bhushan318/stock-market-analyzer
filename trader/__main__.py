@@ -184,6 +184,11 @@ def cmd_universe(cfg, args):
     run_universe(cfg)
 
 
+def cmd_collect(cfg, args):
+    from .collect import main as collect_main
+    collect_main(cfg, args)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="python -m trader")
     ap.add_argument("--config", default=None)
@@ -194,6 +199,11 @@ def main():
     sub.add_parser("ideas").add_argument("--holdout", action="store_true")
     sub.add_parser("mixed")
     sub.add_parser("universe")
+    c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status)")
+    c.add_argument("job", choices=["daily", "news", "backfill", "status"])
+    c.add_argument("--date", help="daily: collect as of this date (YYYY-MM-DD)")
+    c.add_argument("--start", default="2020-01-01", help="backfill start date")
+    c.add_argument("--end", help="backfill end date (default today)")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
                                        help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
@@ -206,7 +216,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "collect": cmd_collect}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":
