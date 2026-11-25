@@ -147,6 +147,7 @@ bash deploy/install.sh                                   # timers; needs sudo fo
   re-fetched automatically. ~1,774 weekdays at ~10/min => ~3 h. If it dies, just rerun the same
   command (it resumes): `nohup .venv/bin/python -u -m trader collect backfill --start 2020-01-01 > backfill.log 2>&1 &`
 - [x] Timers installed and confirmed firing (news fired 22:05 IST). Linger was already on.
+- [x] Git push from the Pi: deploy key `~/.ssh/github_sma` (write access, this repo only), remote `git@github-sma:bhushan318/stock-market-analyzer.git` (host alias in `~/.ssh/config`).
 - Disk: only ~1.8 GB free on the Pi SD card (14 GB, 87% used) - matters for an all-stocks bhavcopy store.
 - [ ] Gemini API key created and put in `.env` (owner)
 
