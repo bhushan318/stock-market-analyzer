@@ -8,3 +8,5 @@ outputs/
 universes/nse_equity_list.csv
 universes/nse_etfs.csv
 backfill.log
+universes/nse_symbol_changes.csv
+backfill_weekends.log

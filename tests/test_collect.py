@@ -70,3 +70,36 @@ def test_have_dates_refetches_partial_days(tmp_path):
     assert _have_dates(con) >= {"2022-01-03", "2022-01-04"}
     have = _have_dates(con, min_symbols=3)
     assert "2022-01-03" in have and "2022-01-04" not in have
+
+
+def test_pit_symbol_changes_and_split_adjustment():
+    import pandas as pd
+    from trader.pit import adjustment_multiplier, apply_symbol_changes, split_events
+    d = pd.to_datetime(["2021-01-04", "2021-01-05", "2021-01-06", "2021-01-07"])
+    df = pd.DataFrame({"date": d, "symbol": ["OLD", "OLD", "NEW", "NEW"],
+                       # 1:5 split effective 2021-01-06: prev_close shows the adjusted 100/5
+                       "prev_close": [99.0, 100.0, 20.0, 21.0], "close": [100.0, 100.0, 21.0, 22.0]})
+    df = apply_symbol_changes(df, [("OLD", "NEW", pd.Timestamp("2021-01-06"))])
+    assert set(df["symbol"]) == {"NEW"}
+    ev = split_events(df)
+    assert len(ev) == 1 and abs(ev.factor[0] - 0.2) < 1e-9 and ev.date[0] == d[2]
+    M = adjustment_multiplier(ev, pd.DatetimeIndex(d), ["NEW"])
+    assert list(M["NEW"]) == [0.2, 0.2, 1.0, 1.0]
+    # a 10% gap (missed Saturday session) is not a split
+    df.loc[2, "prev_close"] = 90.0
+    assert split_events(df).empty
+
+
+def test_export_snapshot_roundtrip(tmp_path):
+    import gzip
+    import shutil
+    import sqlite3
+    from trader.collect import export_snapshot
+    src = tmp_path / "market.db"
+    con = connect(src)
+    upsert(con, "eq_daily", [{"date": "2022-01-03", "symbol": "ABC", "series": "EQ", "close": 10.0}])
+    gz = export_snapshot(src, tmp_path / "snap.db")
+    assert gz.name == "snap.db.gz" and not (tmp_path / "snap.db").exists()
+    out = tmp_path / "restored.db"
+    shutil.copyfileobj(gzip.open(gz), open(out, "wb"))
+    assert sqlite3.connect(out).execute("SELECT close FROM eq_daily").fetchone() == (10.0,)

@@ -4,9 +4,10 @@ Last updated: 2026-11-25 (session moved from the Windows PC to the Raspberry Pi 
 
 ## Where we are
 
-**Pi set up (2026-11-25), backfill running, timers live. Gate 0 step 1 (momentum) run once:
-result is dominated by survivorship bias -> needs a point-in-time universe before it means
-anything (see Results 6). Sector lever maps: Claude drafts them (decision below).**
+**Pi set up (2026-11-25), timers live, full-market backfill running. Gate 0 step 1 (momentum)
+first run was dominated by survivorship bias (Results 6); the point-in-time redo
+(`momentum-pit`) and the lever-beta study (`levers`) are written and tested but NOT yet run on
+real data. Research moves to the PC; the Pi collects and later runs the live system.**
 
 ## The plan (agreed with the owner)
 
@@ -151,14 +152,45 @@ bash deploy/install.sh                                   # timers; needs sudo fo
 - Disk: only ~1.8 GB free on the Pi SD card (14 GB, 87% used) - matters for an all-stocks bhavcopy store.
 - [ ] Gemini API key created and put in `.env` (owner)
 
+## Workflow: PC for research, Pi for collection + live (decided 2026-11-25)
+
+Backtests are ~2,000 full simulations per study - too slow on the Pi. The daily/weekly live run
+(rank today's stocks, 0-4 orders a week) is seconds and stays on the Pi. Data flows Pi -> PC only:
+on the Pi `python -m trader collect export` makes `data/market_snapshot.db.gz` (SQLite online
+backup, safe while collectors write; 69 MB DB -> 28 MB gz); scp it to the PC and unzip to
+`data/market.db`. Live-system risks on the Pi are reliability (reboots, SD card, network), not
+speed: build catch-up checks, retries and failure alerts into Gate 1.
+
+## Point-in-time data (built 2026-11-25, `trader/pit.py`)
+
+- `collect.store_all: true`: every EQ/BE stock (~1,640/day in 2020), not just today's N500.
+- Symbol renames from NSE `symbolchange.csv` (effective-dated, chains resolved).
+- Split/bonus factor = NSE PREV_CLOSE(t) / CLOSE(t-1); only < 0.85 or > 1.18 counts (smaller gaps
+  are missed Saturday sessions, penny-stock ticks, dividends) and only if the previous row is
+  <= 10 days earlier. Dividends are not added back (~1-1.5%/yr lower for rule and random alike).
+- Saturday special sessions (budget day 2020-02-01 etc.) caused false 10-12% gaps: backfill
+  `--weekends` fetches them (queued to run automatically after the main backfill).
+- Universe each week = top 500 by 6-month median turnover at that date, price >= Rs 10, ETFs out.
+- Stocks that stop trading > 10 sessions before the end can be exited at their last close
+  (optimistic for collapses; counted in the output).
+- `momentum-pit` also runs the same rules on "today's Nifty 500" over the same data: the gap is
+  the survivorship bias of Results 6. Learn 2021-23, check 2024+ (signals need 12 months).
+- Smoke run on partial data completed end to end (numbers meaningless).
+
 ## NEXT: Gate 0 backtests (no LLM needed)
+
+Immediate:
+- Pi: wait for backfill (+ weekend sessions), then `collect export`, copy to the PC.
+- PC: `git pull`, `python -m trader levers` (Yahoo only, can run now), then `momentum-pit`.
+- Before trusting `momentum-pit`: spot-check `outputs/mompit_split_events.csv` and compare adjusted
+  closes with Yahoo for a few known splits.
 
 Work on the Pi (studies take minutes; use nohup/tmux). For each signal: rank Nifty 500 stocks
 weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the top decile; compare
 with random picks from the same eligible set and with Nifty 500 buy-and-hold; rolling 1y/3y windows;
 learn on 2020-2023, check on 2024-2026. Note survivorship bias in every report.
 
-1. **Momentum / relative strength** — first run done, biased (Results 6); redo on a point-in-time universe.
+1. **Momentum / relative strength** — first run done, biased (Results 6); point-in-time redo = `momentum-pit` (written, to run).
    Original spec: (prices from Yahoo, 2015+): 6- and 12-month return skipping the
    last month, distance to 52-week high, return vs sector and vs Nifty. Compare with the
    Nifty 200 Momentum 30 ETF (if the ETF matches, prefer the ETF).
@@ -166,7 +198,7 @@ learn on 2020-2023, check on 2024-2026. Note survivorship bias in every report.
    stock's own 20-day average predict the next 5-20 days?
 3. **Results reactions**: around result dates (from announcements going forward; for history use
    big-volume days / NSE results calendar if obtainable) — drift after strong vs weak reactions.
-4. **Lever sensitivities**: regress each stock's weekly returns on crude (BZ=F), USD/INR (INR=X),
+4. **Lever sensitivities** (`levers`, written, to run): regress each stock's weekly returns on crude (BZ=F), USD/INR (INR=X),
    gold, India 10y yield proxy, Nifty, sector index; store betas per stock for the lever maps.
 5. Exit-rule comparison on whatever signal survives: never-sell-at-loss vs target + vol stop
    (track stuck rate).

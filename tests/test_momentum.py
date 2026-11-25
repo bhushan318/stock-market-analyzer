@@ -63,3 +63,31 @@ def test_random_control_uses_hold_distribution():
     assert holds and all(h == 5 for h in holds)
     # flat prices: every round trip loses exactly the charges
     assert all(t[1] < 0 for t in r["trades"])
+
+
+def test_pit_universe_and_signals_have_no_lookahead():
+    from trader.momentum_pit import pit_signals
+    from trader.pit import liquid_universe
+    C, V, _ = _panel()
+    TO = V * C / 1e7 * 5  # Rs cr
+    d = C.index[300]
+    C2, TO2 = C.copy(), TO.copy()
+    C2.loc[C.index > d] *= 3.0
+    TO2.loc[TO.index > d] *= 50.0
+    u1, u2 = liquid_universe(C, TO, top=3), liquid_universe(C2, TO2, top=3)
+    pd.testing.assert_series_equal(u1.loc[d], u2.loc[d])
+    assert u1.loc[d].sum() == 3
+    s1, _ = pit_signals(C, TO, u1)
+    s2, _ = pit_signals(C2, TO2, u2)
+    for k in s1:
+        pd.testing.assert_series_equal(s1[k].loc[d], s2[k].loc[d])
+
+
+def test_lever_fit_recovers_known_betas():
+    from trader.levers import fit
+    rng = np.random.default_rng(1)
+    X = pd.DataFrame(rng.normal(0, 0.02, (400, 3)), columns=["nifty", "crude", "usdinr"])
+    y = 1.1 * X["nifty"] - 0.3 * X["crude"] + rng.normal(0, 0.005, 400)
+    r = fit(y, X)
+    assert abs(r["b_nifty"] - 1.1) < 0.05 and abs(r["b_crude"] + 0.3) < 0.05 and abs(r["b_usdinr"]) < 0.05
+    assert r["t_crude"] < -10

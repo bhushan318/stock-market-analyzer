@@ -189,6 +189,16 @@ def cmd_momentum(cfg, args):
     run_momentum(cfg)
 
 
+def cmd_momentum_pit(cfg, args):
+    from .momentum_pit import run_momentum_pit
+    run_momentum_pit(cfg)
+
+
+def cmd_levers(cfg, args):
+    from .levers import run_levers
+    run_levers(cfg)
+
+
 def cmd_collect(cfg, args):
     from .collect import main as collect_main
     collect_main(cfg, args)
@@ -205,11 +215,14 @@ def main():
     sub.add_parser("mixed")
     sub.add_parser("universe")
     sub.add_parser("momentum", help="Gate 0 step 1: momentum / relative strength study")
-    c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status)")
-    c.add_argument("job", choices=["daily", "news", "backfill", "status"])
+    sub.add_parser("levers", help="Gate 0 step 4: lever sensitivities (crude, USD/INR, gold, rates)")
+    sub.add_parser("momentum-pit", help="Gate 0 step 1 without survivorship bias (NSE bhavcopy universe)")
+    c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status / export)")
+    c.add_argument("job", choices=["daily", "news", "backfill", "status", "export"])
     c.add_argument("--date", help="daily: collect as of this date (YYYY-MM-DD)")
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
+    c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
                                        help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
@@ -222,7 +235,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "collect": cmd_collect}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "levers": cmd_levers, "collect": cmd_collect}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

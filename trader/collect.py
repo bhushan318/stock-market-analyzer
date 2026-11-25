@@ -7,6 +7,9 @@
 """
 
 import csv
+import gzip
+import shutil
+import sqlite3
 from datetime import date, datetime, timedelta, timezone
 
 from . import ROOT
@@ -37,11 +40,12 @@ def tracked_symbols(cfg):
 
 
 def refresh_reference_lists(client):
-    """ETF list and company-name -> symbol map; refreshed at most weekly."""
+    """ETF list, symbol changes and company-name -> symbol map; refreshed at most weekly."""
     uni = ROOT / "universes"
     uni.mkdir(exist_ok=True)
     for name, url in [("nse_etfs.csv", f"{nse.ARCHIVE}/content/equities/eq_etfseclist.csv"),
-                      ("nse_equity_list.csv", f"{nse.ARCHIVE}/content/equities/EQUITY_L.csv")]:
+                      ("nse_equity_list.csv", f"{nse.ARCHIVE}/content/equities/EQUITY_L.csv"),
+                      ("nse_symbol_changes.csv", f"{nse.ARCHIVE}/content/equities/symbolchange.csv")]:
         p = uni / name
         if not p.exists() or (datetime.now().timestamp() - p.stat().st_mtime) > 7 * 86400:
             p.write_bytes(client.get(url).content)
@@ -90,10 +94,10 @@ def collect_bhavcopy(con, client, day, symbols):
     return n
 
 
-def _weekdays(start, end):
+def _weekdays(start, end, weekends=False):
     d = start
     while d <= end:
-        if d.weekday() < 5:
+        if (d.weekday() >= 5) == weekends:
             yield d
         d += timedelta(days=1)
 
@@ -151,7 +155,9 @@ def run_news(cfg):
     return report
 
 
-def run_backfill(cfg, start, end=None):
+def run_backfill(cfg, start, end=None, weekends=False):
+    """weekends=True tries Saturdays/Sundays only: NSE trades on a few (budget day, muhurat,
+    DR drills); the rest are logged as not_published/holiday and skipped next time."""
     con, client = connect(db_path(cfg)), nse.NSEClient(pause=1.0)
     try:
         refresh_reference_lists(client)
@@ -160,7 +166,7 @@ def run_backfill(cfg, start, end=None):
     symbols = tracked_symbols(cfg)
     have = _have_dates(con, FULL_DAY_MIN_SYMBOLS if symbols is None else 0)
     end = end or date.today()
-    days = [d for d in _weekdays(start, end) if d.isoformat() not in have]
+    days = [d for d in _weekdays(start, end, weekends) if d.isoformat() not in have]
     print(f"Backfilling {len(days)} weekdays ({start} -> {end}); ~1 request/second ...")
     done = 0
     for k, d in enumerate(days):
@@ -173,6 +179,24 @@ def run_backfill(cfg, start, end=None):
         if k % 50 == 0:
             print(f"  {k}/{len(days)} checked, {done} trading days stored")
     print(f"Done: {done} trading days stored.")
+
+
+def export_snapshot(src, dest):
+    """Consistent copy of the live DB (SQLite online backup: safe while a collector is writing),
+    gzipped for copying to the research PC. Returns the .gz path."""
+    dest = dest.with_suffix(".db") if dest.suffix != ".db" else dest
+    if dest.exists():
+        dest.unlink()
+    s, d = sqlite3.connect(src), sqlite3.connect(dest)
+    with d:
+        s.backup(d)
+    s.close()
+    d.close()
+    gz = dest.with_name(dest.name + ".gz")
+    with open(dest, "rb") as fi, gzip.open(gz, "wb", compresslevel=6) as fo:
+        shutil.copyfileobj(fi, fo, 1 << 20)
+    dest.unlink()
+    return gz
 
 
 def status(cfg):
@@ -203,6 +227,13 @@ def main(cfg, args):
         print(run_news(cfg))
     elif args.job == "backfill":
         run_backfill(cfg, date.fromisoformat(args.start),
-                     date.fromisoformat(args.end) if args.end else None)
+                     date.fromisoformat(args.end) if args.end else None, weekends=args.weekends)
     elif args.job == "status":
         status(cfg)
+    elif args.job == "export":
+        src = db_path(cfg)
+        gz = export_snapshot(src, src.with_name("market_snapshot.db"))
+        print(f"Snapshot: {gz} ({gz.stat().st_size / 1e6:.0f} MB). On the PC:\n"
+              f"  scp {__import__('getpass').getuser()}@<pi-ip>:{gz} data/\n"
+              f"  then unzip to data/market.db (python -c \"import gzip,shutil;"
+              f"shutil.copyfileobj(gzip.open('data/market_snapshot.db.gz'),open('data/market.db','wb'))\")")
