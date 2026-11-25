@@ -179,6 +179,11 @@ def cmd_mixed(cfg, args):
     run_mixed(cfg, probs)
 
 
+def cmd_universe(cfg, args):
+    from .universe_study import run_universe
+    run_universe(cfg)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="python -m trader")
     ap.add_argument("--config", default=None)
@@ -188,6 +193,7 @@ def main():
     sub.add_parser("backtest")
     sub.add_parser("ideas").add_argument("--holdout", action="store_true")
     sub.add_parser("mixed")
+    sub.add_parser("universe")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
                                        help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
@@ -200,7 +206,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":
