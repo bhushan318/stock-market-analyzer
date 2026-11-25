@@ -59,3 +59,14 @@ def test_upsert_is_idempotent(tmp_path):
     assert upsert(con, "eq_daily", rows) == 3
     assert upsert(con, "eq_daily", rows) == 0
     assert con.execute("SELECT COUNT(*) FROM eq_daily").fetchone()[0] == 3
+
+
+def test_have_dates_refetches_partial_days(tmp_path):
+    from trader.collect import _have_dates
+    con = connect(tmp_path / "m.db")
+    rows = [{"date": "2022-01-03", "symbol": f"S{i}", "series": "EQ"} for i in range(5)]
+    rows += [{"date": "2022-01-04", "symbol": "S0", "series": "EQ"}]
+    upsert(con, "eq_daily", rows)
+    assert _have_dates(con) >= {"2022-01-03", "2022-01-04"}
+    have = _have_dates(con, min_symbols=3)
+    assert "2022-01-03" in have and "2022-01-04" not in have

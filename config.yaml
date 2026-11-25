@@ -104,5 +104,6 @@ backtest:
 
 collect:                     # NSE data collectors (python -m trader collect ...)
   db_path: data/market.db
-  store_all: false           # false = Nifty 500 + all NSE ETFs + extra_symbols (keeps the DB small)
+  store_all: true            # every EQ/BE stock (~2,300/day, ~700 MB for 2020+): needed for a point-in-time
+                             # universe incl. stocks that later collapsed. false = Nifty 500 + ETFs + extras
   extra_symbols: []

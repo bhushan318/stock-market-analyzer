@@ -53,9 +53,17 @@ def refresh_reference_lists(client):
     return names
 
 
-def _have_dates(con):
-    """Days already stored, plus past days confirmed as holidays / never published."""
-    have = {r[0] for r in con.execute("SELECT DISTINCT date FROM eq_daily")}
+FULL_DAY_MIN_SYMBOLS = 1000  # a store_all day has ~2,000+ EQ/BE symbols; filtered days ~860
+
+
+def _have_dates(con, min_symbols=0):
+    """Days already stored, plus past days confirmed as holidays / never published.
+
+    min_symbols > 0 treats days stored with fewer symbols (e.g. before store_all was switched
+    on) as missing, so they are fetched again; upsert overwrites the old rows in place.
+    """
+    have = {r[0] for r in con.execute(
+        "SELECT date FROM eq_daily GROUP BY date HAVING COUNT(*) >= ?", (min_symbols,))}
     have |= {r[0] for r in con.execute(
         "SELECT DISTINCT ref FROM collect_log WHERE source='bhavcopy' AND status='holiday'")}
     # 'not_published' only counts once the day is well past (files appear the same evening)
@@ -99,7 +107,7 @@ def run_daily(cfg, day=None):
     except Exception as e:  # reference lists are a convenience; never block the price data
         log(con, "reference", "", "error", 0, str(e))
     today = day or date.today()
-    have = _have_dates(con)
+    have = _have_dates(con, FULL_DAY_MIN_SYMBOLS if symbols is None else 0)
     report = {}
     for d in _weekdays(today - timedelta(days=CATCHUP_DAYS), today):
         if d.isoformat() not in have:
@@ -150,7 +158,7 @@ def run_backfill(cfg, start, end=None):
     except Exception:
         pass
     symbols = tracked_symbols(cfg)
-    have = _have_dates(con)
+    have = _have_dates(con, FULL_DAY_MIN_SYMBOLS if symbols is None else 0)
     end = end or date.today()
     days = [d for d in _weekdays(start, end) if d.isoformat() not in have]
     print(f"Backfilling {len(days)} weekdays ({start} -> {end}); ~1 request/second ...")

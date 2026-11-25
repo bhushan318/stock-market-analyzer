@@ -141,7 +141,11 @@ bash deploy/install.sh                                   # timers; needs sudo fo
 .venv/bin/python -m trader collect status
 ```
 - [x] Pi set up, tests pass (16 passed, Python 3.13, 2026-11-25)
-- [ ] Backfill finished (expect ~1,700 trading days; runs ~10 days/min => ~3 h; started 21:52 IST 2026-11-25)
+- [ ] Backfill finished. First run (Nifty 500 + ETFs only) died at 2022-01-20 when the Pi rebooted.
+  Restarted 22:45 IST 2026-11-25 with `store_all: true` (every EQ/BE stock, ~1,640/day in 2020,
+  est. ~500-700 MB) so a point-in-time universe is possible; days stored with <1,000 symbols are
+  re-fetched automatically. ~1,774 weekdays at ~10/min => ~3 h. If it dies, just rerun the same
+  command (it resumes): `nohup .venv/bin/python -u -m trader collect backfill --start 2020-01-01 > backfill.log 2>&1 &`
 - [x] Timers installed and confirmed firing (news fired 22:05 IST). Linger was already on.
 - Disk: only ~1.8 GB free on the Pi SD card (14 GB, 87% used) - matters for an all-stocks bhavcopy store.
 - [ ] Gemini API key created and put in `.env` (owner)
