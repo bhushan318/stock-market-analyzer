@@ -160,6 +160,18 @@ def cmd_picks(cfg, args):
     print("\nshares_for_slot = 0 means the stock is too expensive for one slot.")
 
 
+def cmd_ideas(cfg, args):
+    from .experiments import run_ideas
+    prices, market = load(cfg, args.refresh)
+    panel, probs = get_panel_and_probs(cfg, prices, market)
+    run_ideas(cfg, prices, market, panel, probs, holdout=args.holdout)
+
+
+def cmd_etf(cfg, args):
+    from .etf_study import run_study
+    run_study(cfg, broad=args.broad)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="python -m trader")
     ap.add_argument("--config", default=None)
@@ -167,6 +179,9 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("evaluate")
     sub.add_parser("backtest")
+    sub.add_parser("ideas").add_argument("--holdout", action="store_true")
+    sub.add_parser("etf").add_argument("--broad", action="store_true",
+                                       help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
     p.add_argument("--cash", type=float, default=None)
     p.add_argument("--slots", type=int, default=None)
@@ -176,7 +191,8 @@ def main():
     cfg = load_config(args.config)
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
-    {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks}[args.cmd](cfg, args)
+    {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
+     "ideas": cmd_ideas, "etf": cmd_etf}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

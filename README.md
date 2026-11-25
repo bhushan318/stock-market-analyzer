@@ -44,6 +44,19 @@ All packages have 64-bit ARM wheels, so nothing compiles on the Pi. Use the 64-b
 .venv/bin/python -m trader --refresh backtest       # force a fresh price download
 ```
 
+### ETF study (current preferred direction)
+
+```bash
+.venv/bin/python -m trader etf --broad   # broad ETFs: targets 3-8%, windows 1/3/5/10/18y, rolling starts, seasonality
+.venv/bin/python -m trader etf           # same with sector/thematic ETFs included
+.venv/bin/python -m trader ideas         # stock-strategy variants (market filter, uptrend, averaging down...)
+```
+
+Findings so far (broad ETFs, buy the deepest dip below the 20-day average, sell at +5% net,
+never at a loss, Rs 20k, 6 slots): ~16% a year over 2009-2026 before tax; no 3-year rolling
+window lost money; sector ETFs (PSU Bank -78%, Silver -61%) are excluded because a decade-long
+fall freezes money under the no-loss rule; seasonality did not repeat out of sample.
+
 - Prices come from Yahoo Finance (free) and are cached in `data/cache/` for 12 hours.
   Today's bar is ignored until 15:45 IST so a half-finished day never feeds the model.
 - `evaluate` takes ~1–2 minutes on a laptop (expect several minutes on a Pi 4).

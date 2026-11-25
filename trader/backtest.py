@@ -6,6 +6,13 @@ Timeline for each trading day d:
             (at the Open if the stock gaps up above the target)
   15:30  mark-to-market at Close; rank stocks with today's scores; queue tomorrow's buys
 Positions are never sold below the target unless `max_hold_days` / `stop_loss` are set.
+
+Optional rules (all keep "never sell at a loss" intact):
+  regime_filter   no new positions while the benchmark closes below its 200-day average
+  target_decay    [[days, take_profit], ...] lower the (still positive, net) target as a position ages
+  reserve_pct     keep this share of equity in cash for averaging down; new positions use the rest
+  avg_down        {"trigger": 0.10, "max_adds": 2, "size": 1.0} buy more when the close is
+                  `trigger` below the average price; size = multiple of the original investment
 """
 
 import math
@@ -25,10 +32,20 @@ class Position:
     cost_basis: float  # shares * buy_price + buy charges
     buy_pos: int
     target: float
+    first_cost: float = 0.0
+    adds: int = 0
+
+
+def _current_tp(strat, days_held):
+    tp = strat["take_profit"]
+    for days, val in sorted(strat.get("target_decay") or []):
+        if days_held >= days:
+            tp = val
+    return max(tp, 0.0)
 
 
 def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat, costs,
-                 stuck_days=60):
+                 stuck_days=60, market_close=None):
     """opens/highs/lows/closes: date x ticker frames on one calendar.
 
     scores: callable(pos, date) -> pd.Series(ticker -> score) available at that day's close,
@@ -51,10 +68,18 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
     max_hold = strat.get("max_hold_days")
     stop = strat.get("stop_loss")
     slip = costs["slippage"]
+    reserve_pct = strat.get("reserve_pct") or 0.0
+    avg_down = strat.get("avg_down")
+    blackout = set(strat.get("blackout_months") or [])  # no NEW positions in these months
+    risk_off = np.zeros(len(cal), dtype=bool)
+    if strat.get("regime_filter") and market_close is not None:
+        m = market_close.reindex(cal).ffill()
+        risk_off = (m < m.rolling(200).mean()).to_numpy()
 
     cash = float(capital)
     positions: dict[str, Position] = {}
     pending: list[tuple[str, int]] = []
+    pending_adds: list[tuple[str, int]] = []
     last_exit: dict[str, int] = {}
     trades, equity_rows = [], []
     worst_unrealised = 0.0
@@ -79,8 +104,28 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             charges_paid += ch
             basis = shares * px + ch
             positions[t] = Position(t, shares, px, basis, i,
-                                    target_price(shares, px, basis, tp, costs, net))
+                                    target_price(shares, px, basis, tp, costs, net), basis)
         pending = []
+
+        # 1b) fill averaging-down orders at the open
+        for t, shares in pending_adds:
+            p = positions.get(t)
+            o = O[i, col[t]]
+            if p is None or np.isnan(o):
+                continue
+            px = o * (1 + slip)
+            while shares > 0 and shares * px + buy_charges(shares * px, costs) > cash:
+                shares -= 1
+            if shares == 0:
+                continue
+            ch = buy_charges(shares * px, costs)
+            cash -= shares * px + ch
+            charges_paid += ch
+            p.buy_price = (p.shares * p.buy_price + shares * px) / (p.shares + shares)
+            p.shares += shares
+            p.cost_basis += shares * px + ch
+            p.adds += 1
+        pending_adds = []
 
         # 2) exits during the day (not on the day of purchase)
         for t, p in list(positions.items()):
@@ -90,6 +135,8 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             o, h, lo, c = O[i, j], H[i, j], L[i, j], C[i, j]
             if np.isnan(o):
                 continue
+            p.target = target_price(p.shares, p.buy_price, p.cost_basis,
+                                    _current_tp(strat, i - p.buy_pos), costs, net)
             exit_px, why = None, None
             if o >= p.target:
                 exit_px, why = o, "target_gap"
@@ -108,7 +155,7 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             pnl = value - ch - p.cost_basis
             trades.append({
                 "ticker": t, "buy_date": cal[p.buy_pos].date(), "sell_date": d.date(),
-                "days_held": i - p.buy_pos, "shares": p.shares,
+                "days_held": i - p.buy_pos, "shares": p.shares, "adds": p.adds,
                 "buy_price": round(p.buy_price, 2), "sell_price": round(exit_px, 2),
                 "pnl": round(pnl, 2), "return_net": pnl / p.cost_basis, "reason": why,
             })
@@ -129,15 +176,32 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
         equity_rows.append({"date": d, "equity": equity, "cash": cash, "invested": held_val,
                             "n_positions": len(positions), "stuck_value": stuck_val})
 
-        # 4) choose tomorrow's buys
+        if i + 1 >= i1:
+            continue
+
+        # 3b) averaging down: may use the reserve
+        spare = cash
+        if avg_down:
+            for t, p in positions.items():
+                c = C[i, col[t]]
+                if np.isnan(c) or p.adds >= avg_down["max_adds"]:
+                    continue
+                if c <= p.buy_price * (1 - avg_down["trigger"]):
+                    est = c * (1 + slip) * 1.003
+                    shares = math.floor(min(p.first_cost * avg_down.get("size", 1.0), spare) / est)
+                    if shares >= 1 and shares * est >= min_val * 0.5:
+                        pending_adds.append((t, shares))
+                        spare -= shares * est
+
+        # 4) choose tomorrow's buys (new positions keep the reserve untouched)
         free = max_pos - len(positions)
-        if i + 1 >= i1 or free <= 0 or cash < min_val:
+        budget_cash = spare - reserve_pct * equity
+        if free <= 0 or budget_cash < min_val or risk_off[i] or d.month in blackout:
             continue
         s = scores(i, d)
         if s is None or len(s) == 0:
             continue
         s = s[s >= min_prob].sort_values(ascending=False)
-        budget_cash = cash
         for t in s.index:
             if free == 0:
                 break

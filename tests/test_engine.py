@@ -90,3 +90,15 @@ def test_backtest_never_sells_at_a_loss_and_conserves_cash():
     assert (tr["reason"].isin(["target", "target_gap"])).all()
     assert (res["equity"]["cash"] >= -1e-6).all()
     assert (res["equity"]["n_positions"] <= 4).all()
+
+
+def test_clean_bad_ticks_removes_misscaled_rows_and_phantom_opens():
+    from trader.data import clean_bad_ticks
+    df = make_prices(n=60, seed=7)
+    df.iloc[30, :4] = df.iloc[30, :4] / 10          # NIFTYBEES-style 1/10th print
+    df.iloc[40, df.columns.get_loc("Open")] *= 1.3   # phantom open
+    df.iloc[40, df.columns.get_loc("High")] = df.iloc[40]["Open"]
+    out, n_spike, n_open = clean_bad_ticks(df)
+    assert n_spike == 1 and n_open == 1
+    assert df.index[30] not in out.index
+    assert out.loc[df.index[40], "High"] < df.iloc[40]["High"]
