@@ -102,3 +102,24 @@ def test_clean_bad_ticks_removes_misscaled_rows_and_phantom_opens():
     assert n_spike == 1 and n_open == 1
     assert df.index[30] not in out.index
     assert out.loc[df.index[40], "High"] < df.iloc[40]["High"]
+
+
+def test_group_slot_limits_respected():
+    prices = {f"S{k}": make_prices(n=400, seed=30 + k, drift=0.0) for k in range(6)}
+    O, H, L, C = _frames(prices)
+    groups = {"S0": "etf", "S1": "etf", "S2": "etf", "S3": "stock", "S4": "stock", "S5": "stock"}
+    rng = np.random.default_rng(1)
+    scores = lambda i, d: pd.Series(rng.random(6), index=C.columns)  # noqa: E731
+    strat = {"take_profit": 0.05, "max_positions": 5, "min_position_value": 1000,
+             "groups": groups, "group_limits": {"etf": 3, "stock": 2}}
+    res = run_backtest(O, H, L, C, scores, C.index[30], None, 20000, strat,
+                       {**COSTS, "stt_by_ticker": {"S0": 0.0}})
+    tr = res["trades"]
+    assert len(tr) > 5
+    # replay holdings day by day from the trade log + open positions and check the stock cap
+    held = pd.concat([tr[["ticker", "buy_date", "sell_date"]],
+                      res["open"].assign(sell_date=C.index[-1].date())[["ticker", "buy_date", "sell_date"]]])
+    for d in C.index[30::5]:
+        live = held[(pd.to_datetime(held.buy_date) <= d) & (pd.to_datetime(held.sell_date) > d)]
+        assert (live.ticker.map(groups) == "stock").sum() <= 2
+        assert (live.ticker.map(groups) == "etf").sum() <= 3

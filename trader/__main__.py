@@ -172,6 +172,13 @@ def cmd_etf(cfg, args):
     run_study(cfg, broad=args.broad)
 
 
+def cmd_mixed(cfg, args):
+    from .mixed_study import run_mixed
+    prices, market = load(cfg, args.refresh)
+    _, probs = get_panel_and_probs(cfg, prices, market)
+    run_mixed(cfg, probs)
+
+
 def main():
     ap = argparse.ArgumentParser(prog="python -m trader")
     ap.add_argument("--config", default=None)
@@ -180,6 +187,7 @@ def main():
     sub.add_parser("evaluate")
     sub.add_parser("backtest")
     sub.add_parser("ideas").add_argument("--holdout", action="store_true")
+    sub.add_parser("mixed")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
                                        help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
@@ -192,7 +200,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

@@ -76,6 +76,11 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
         m = market_close.reindex(cal).ffill()
         risk_off = (m < m.rolling(200).mean()).to_numpy()
 
+    stt_over = costs.get("stt_by_ticker") or {}
+    tc = {t: {**costs, "stt": stt_over.get(t, costs["stt"])} for t in tickers}  # per-ticker costs
+    groups = strat.get("groups") or {}             # ticker -> group name, e.g. "etf" / "stock"
+    group_limits = strat.get("group_limits") or {}  # group name -> max open positions
+
     cash = float(capital)
     positions: dict[str, Position] = {}
     pending: list[tuple[str, int]] = []
@@ -95,16 +100,16 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             if np.isnan(o) or t in positions:
                 continue
             px = o * (1 + slip)
-            while shares > 0 and shares * px + buy_charges(shares * px, costs) > cash:
+            while shares > 0 and shares * px + buy_charges(shares * px, tc[t]) > cash:
                 shares -= 1
             if shares == 0:
                 continue
-            ch = buy_charges(shares * px, costs)
+            ch = buy_charges(shares * px, tc[t])
             cash -= shares * px + ch
             charges_paid += ch
             basis = shares * px + ch
             positions[t] = Position(t, shares, px, basis, i,
-                                    target_price(shares, px, basis, tp, costs, net), basis)
+                                    target_price(shares, px, basis, tp, tc[t], net), basis)
         pending = []
 
         # 1b) fill averaging-down orders at the open
@@ -114,11 +119,11 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             if p is None or np.isnan(o):
                 continue
             px = o * (1 + slip)
-            while shares > 0 and shares * px + buy_charges(shares * px, costs) > cash:
+            while shares > 0 and shares * px + buy_charges(shares * px, tc[t]) > cash:
                 shares -= 1
             if shares == 0:
                 continue
-            ch = buy_charges(shares * px, costs)
+            ch = buy_charges(shares * px, tc[t])
             cash -= shares * px + ch
             charges_paid += ch
             p.buy_price = (p.shares * p.buy_price + shares * px) / (p.shares + shares)
@@ -136,7 +141,7 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             if np.isnan(o):
                 continue
             p.target = target_price(p.shares, p.buy_price, p.cost_basis,
-                                    _current_tp(strat, i - p.buy_pos), costs, net)
+                                    _current_tp(strat, i - p.buy_pos), tc[t], net)
             exit_px, why = None, None
             if o >= p.target:
                 exit_px, why = o, "target_gap"
@@ -149,7 +154,7 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             if exit_px is None:
                 continue
             value = p.shares * exit_px
-            ch = sell_charges(value, costs)
+            ch = sell_charges(value, tc[t])
             cash += value - ch
             charges_paid += ch
             pnl = value - ch - p.cost_basis
@@ -202,10 +207,16 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
         if s is None or len(s) == 0:
             continue
         s = s[s >= min_prob].sort_values(ascending=False)
+        in_group: dict[str, int] = {}
+        for t in positions:
+            in_group[groups.get(t)] = in_group.get(groups.get(t), 0) + 1
         for t in s.index:
             if free == 0:
                 break
             if t in positions or (t in last_exit and i - last_exit[t] < cooldown):
+                continue
+            g = groups.get(t)
+            if g in group_limits and in_group.get(g, 0) >= group_limits[g]:
                 continue
             c = C[i, col[t]]
             if np.isnan(c):
@@ -218,6 +229,7 @@ def run_backtest(opens, highs, lows, closes, scores, start, end, capital, strat,
             if shares < 1:
                 continue  # can't afford even one share - try the next candidate
             pending.append((t, shares))
+            in_group[groups.get(t)] = in_group.get(groups.get(t), 0) + 1
             budget_cash -= shares * est
             free -= 1
 
