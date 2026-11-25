@@ -5,3 +5,5 @@ data/
 outputs/
 .pytest_cache/
 .env
+universes/nse_equity_list.csv
+universes/nse_etfs.csv
