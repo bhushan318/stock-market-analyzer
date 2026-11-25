@@ -60,15 +60,37 @@ def download_prices(tickers, start, cache_dir="data/cache", max_age_hours=12, re
         if age_h < max_age_hours and set(tickers) <= set(cached):
             return {t: cached[t] for t in tickers}
 
-    raw = yf.download(list(tickers), start=start, auto_adjust=True, group_by="ticker",
-                      progress=False, threads=True)
+    def fetch(tks, threads):
+        raw = yf.download(list(tks), start=start, auto_adjust=True, group_by="ticker",
+                          progress=False, threads=threads)
+        got = {}
+        for t in tks:
+            try:
+                df = raw[t][COLS].dropna(subset=["Open", "High", "Low", "Close"])
+            except KeyError:
+                continue
+            if len(df):
+                got[t] = df
+        return got
+
+    # Threaded bulk download first. yfinance's internal sqlite cache can raise
+    # "database is locked" under threads and silently drop tickers, so retry the
+    # missing ones single-threaded.
+    frames = fetch(tickers, True)
+    for attempt in range(2):
+        missing = [t for t in tickers if t not in frames]
+        if not missing:
+            break
+        print(f"  retrying {len(missing)} tickers (attempt {attempt + 1}) ...", flush=True)
+        time.sleep(5)
+        frames.update(fetch(missing, False))
+
     out = {}
     for t in tickers:
-        try:
-            df = raw[t][COLS].dropna(subset=["Open", "High", "Low", "Close"])
-        except KeyError:
+        if t not in frames:
             print(f"  ! no data for {t}")
             continue
+        df = frames[t]
         df = df[df["Close"] > 0]
         df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
         df = _drop_incomplete_today(df)

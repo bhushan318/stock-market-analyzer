@@ -184,6 +184,11 @@ def cmd_universe(cfg, args):
     run_universe(cfg)
 
 
+def cmd_momentum(cfg, args):
+    from .momentum_study import run_momentum
+    run_momentum(cfg)
+
+
 def cmd_collect(cfg, args):
     from .collect import main as collect_main
     collect_main(cfg, args)
@@ -199,6 +204,7 @@ def main():
     sub.add_parser("ideas").add_argument("--holdout", action="store_true")
     sub.add_parser("mixed")
     sub.add_parser("universe")
+    sub.add_parser("momentum", help="Gate 0 step 1: momentum / relative strength study")
     c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status)")
     c.add_argument("job", choices=["daily", "news", "backfill", "status"])
     c.add_argument("--date", help="daily: collect as of this date (YYYY-MM-DD)")
@@ -216,7 +222,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "collect": cmd_collect}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "collect": cmd_collect}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

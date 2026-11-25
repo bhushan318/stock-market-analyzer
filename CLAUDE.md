@@ -55,6 +55,7 @@ trader/            engine package (python -m trader <command>)
   etf_study.py     ETF targets/windows/seasonality  -> python -m trader etf [--broad]
   mixed_study.py   ETF + stock slot splits          -> python -m trader mixed
   universe_study.py Nifty 50 vs 500 + random ctrl   -> python -m trader universe
+  momentum_study.py Gate 0.1 momentum/RS signals    -> python -m trader momentum
   nse.py, collect.py, store.py  NSE collectors      -> python -m trader collect daily|news|backfill|status
 config.yaml        every strategy rule, costs, collector settings
 universes/         saved constituent lists (nifty500_2026-11.csv)

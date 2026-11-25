@@ -7,3 +7,4 @@ outputs/
 .env
 universes/nse_equity_list.csv
 universes/nse_etfs.csv
+backfill.log

@@ -4,8 +4,9 @@ Last updated: 2026-11-25 (session moved from the Windows PC to the Raspberry Pi 
 
 ## Where we are
 
-**Phase 1 (data collection) is built and pushed. Next: install it on the Pi, run the backfill,
-then start Gate 0 backtests (below).**
+**Pi set up (2026-11-25), backfill running, timers live. Gate 0 step 1 (momentum) run once:
+result is dominated by survivorship bias -> needs a point-in-time universe before it means
+anything (see Results 6). Sector lever maps: Claude drafts them (decision below).**
 
 ## The plan (agreed with the owner)
 
@@ -37,6 +38,12 @@ reviews) + measured lever sensitivities → (3) news archive tagged by LLM → (
 - **LLM:** owner has Google AI Pro (app subscription, no API). Plan: free Gemini API key from
   Google AI Studio, stored in `.env` (`GEMINI_API_KEY=...`), model name in config. Not created yet.
   Only public news/filings go to it.
+- **Sector lever maps (decided 2026-11-25):** one-time job, drafted by Claude in a work session
+  (no API cost), not Gemini. Gemini is only for the recurring news tagging. Method: NSE's official
+  4-level industry classification (fetched from NSE, not LLM-labelled) -> Claude drafts levers per
+  sub-industry (direction, mechanism, lag, confidence, data series; no magnitudes) -> checked
+  against measured betas (Gate 0 step 4), disagreements flagged -> owner reviews. Refresh at each
+  March/September index rebalance or after a major policy change.
 - Universe: use official Nifty 500 list (+ liquidity filter), *not* an LLM-generated list
   (LLM may only suggest extras that are verified against NSE's equity list).
 
@@ -88,6 +95,27 @@ slots, sell at +5% net, never at a loss. Data 2009-2026 (Yahoo ETF history start
 **Key finding: the price-only dip rule did not beat random stock picks (N50 or N500) in any setup.**
 Nifty 500 was worse than Nifty 50 for this rule. → motivates the fundamentals + catalysts approach.
 
+### 6. Gate 0 step 1: momentum on today's Nifty 500 (2026-11-25) - NOT TRUSTWORTHY YET
+`python -m trader momentum` (trader/momentum_study.py). Signals: 12-1 and 6-1 month return,
+distance to 52w high, 6m return vs sector median, combo. (Return vs Nifty = same ranking as raw
+return, so not separate.) Weekly ranking, 499 stocks, ~400 eligible (>= Rs 2 cr turnover).
+- Signal test (top decile minus average eligible, 20d forward, gross): 12-1 momentum +1.25%
+  (learn) / +0.91% (check 2024+), beats in 64-67% of weeks; 6-1 and sector RS faded in 2024+
+  (+0.3%); 52w-high ~0.
+- Portfolio (5 stocks, Rs 20k, sell when out of top 20, all charges): 12-1 momentum 44%/yr
+  2016-26 vs random 18%, Nifty 500 12.5%; 3y rolling windows beat random 91%.
+- **But** the whole gain comes from 10 of 128 trades (ADANIGREEN +828%, TTML, DIXON, CGPOWER,
+  APARINDS, TITAGARH, MAZDOCK ...); the other 118 trades net to a loss. These are exactly the
+  stocks that are in today's Nifty 500 *because* they multiplied -> survivorship bias. No data
+  glitches found. The real point-in-time Nifty 200 Momentum 30 ETF made +8.8%/yr since Aug 2022
+  vs Nifty 500 +11.4%, while our version showed +40%.
+- "Never sell at a loss" variant: lower return (28% vs 45% on the same biased data), stuck 27%.
+- 52w-high variant churns (5-day holds, 150 trades/yr) because many stocks tie at the high; ignore.
+- Note: `charges_pct_yr` is charges / *starting* capital per year, so it balloons as equity grows.
+- Fix needed: point-in-time universe (NSE full bhavcopy incl. later-collapsed stocks, liquidity
+  ranked each month, split/bonus adjusted) and/or the official Nifty 200 Momentum 30 index history
+  (niftyindices.com, point-in-time by construction) as the honest benchmark.
+
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
 `python -m trader collect daily|news|backfill|status` → `data/market.db` (SQLite):
@@ -112,9 +140,10 @@ nohup .venv/bin/python -m trader collect backfill --start 2020-01-01 > backfill.
 bash deploy/install.sh                                   # timers; needs sudo for enable-linger
 .venv/bin/python -m trader collect status
 ```
-- [ ] Pi set up, tests pass
-- [ ] Backfill finished (expect ~1,700 trading days)
-- [ ] Timers installed and confirmed firing (`systemctl --user list-timers 'trader-*'`)
+- [x] Pi set up, tests pass (16 passed, Python 3.13, 2026-11-25)
+- [ ] Backfill finished (expect ~1,700 trading days; runs ~10 days/min => ~3 h; started 21:52 IST 2026-11-25)
+- [x] Timers installed and confirmed firing (news fired 22:05 IST). Linger was already on.
+- Disk: only ~1.8 GB free on the Pi SD card (14 GB, 87% used) - matters for an all-stocks bhavcopy store.
 - [ ] Gemini API key created and put in `.env` (owner)
 
 ## NEXT: Gate 0 backtests (no LLM needed)
@@ -124,7 +153,8 @@ weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the to
 with random picks from the same eligible set and with Nifty 500 buy-and-hold; rolling 1y/3y windows;
 learn on 2020-2023, check on 2024-2026. Note survivorship bias in every report.
 
-1. **Momentum / relative strength** (prices from Yahoo, 2015+): 6- and 12-month return skipping the
+1. **Momentum / relative strength** — first run done, biased (Results 6); redo on a point-in-time universe.
+   Original spec: (prices from Yahoo, 2015+): 6- and 12-month return skipping the
    last month, distance to 52-week high, return vs sector and vs Nifty. Compare with the
    Nifty 200 Momentum 30 ETF (if the ETF matches, prefer the ETF).
 2. **Delivery %** (from `eq_daily`, 2020+): does rising delivery % on up-days / high delivery vs the
