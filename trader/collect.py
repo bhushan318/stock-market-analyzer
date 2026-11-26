@@ -79,7 +79,7 @@ def _have_dates(con, min_symbols=0):
 
 def collect_bhavcopy(con, client, day, symbols):
     try:
-        text = client.get(nse.bhavcopy_url(day)).text
+        text = nse.bhavcopy_text(client.get(nse.bhavcopy_url(day)).content)
     except nse.NotPublished:
         log(con, "bhavcopy", day.isoformat(), "not_published")
         return None

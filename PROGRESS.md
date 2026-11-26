@@ -168,6 +168,12 @@ speed: build catch-up checks, retries and failure alerts into Gate 1.
 - Split/bonus factor = NSE PREV_CLOSE(t) / CLOSE(t-1); only < 0.85 or > 1.18 counts (smaller gaps
   are missed Saturday sessions, penny-stock ticks, dividends) and only if the previous row is
   <= 10 days earlier. Dividends are not added back (~1-1.5%/yr lower for rule and random alike).
+- 2026-11-26: backfill crawled (250 -> 25 days/hour, 19 GB written in 11 h) because the Pi's
+  system disk is a USB flash stick and the eq_daily(symbol, date) index made every insert hit
+  ~2,000 scattered pages. Index dropped (nothing reads by symbol; all reads are by date = PK):
+  6 days/min again, and far less flash wear. Keep new indexes off eq_daily unless really needed.
+- NSE served 2022-08-08 as an .xlsx under the .csv name; `nse.bhavcopy_text` now detects that
+  and converts it (stdlib only).
 - Saturday special sessions (budget day 2020-02-01 etc.) caused false 10-12% gaps: backfill
   `--weekends` fetches them (queued to run automatically after the main backfill).
 - Universe each week = top 500 by 6-month median turnover at that date, price >= Rs 10, ETFs out.

@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS eq_daily (          -- NSE full bhavcopy: prices + de
     volume INTEGER, turnover_lacs REAL, trades INTEGER, deliv_qty INTEGER, deliv_pct REAL,
     PRIMARY KEY (date, symbol, series)
 );
-CREATE INDEX IF NOT EXISTS eq_daily_symbol ON eq_daily(symbol, date);
+-- no (symbol, date) index: every read is by date (PK), and on the Pi's USB flash disk that index
+-- made each day's ~2,000 inserts touch ~2,000 scattered pages (19 GB written for a 0.4 GB DB).
+DROP INDEX IF EXISTS eq_daily_symbol;
 
 CREATE TABLE IF NOT EXISTS deals (             -- bulk and block deals
     date TEXT, kind TEXT, symbol TEXT, security TEXT, client TEXT, side TEXT,

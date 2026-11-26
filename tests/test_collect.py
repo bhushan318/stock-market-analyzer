@@ -103,3 +103,29 @@ def test_export_snapshot_roundtrip(tmp_path):
     out = tmp_path / "restored.db"
     shutil.copyfileobj(gzip.open(gz), open(out, "wb"))
     assert sqlite3.connect(out).execute("SELECT close FROM eq_daily").fetchone() == (10.0,)
+
+
+def test_bhavcopy_served_as_xlsx_is_parsed():
+    import io
+    import zipfile
+    m = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    head = ["SYMBOL", " SERIES", " DATE1", " PREV_CLOSE", " OPEN_PRICE", " HIGH_PRICE", " LOW_PRICE",
+            " LAST_PRICE", " CLOSE_PRICE", " AVG_PRICE", " TTL_TRD_QNTY", " TURNOVER_LACS",
+            " NO_OF_TRADES", " DELIV_QTY", " DELIV_PER"]
+    strings = head + ["ABC", " EQ", " 08-Aug-2022"]
+    sst = f"<sst {m}>" + "".join(f"<si><t>{x}</t></si>" for x in strings) + "</sst>"
+    cols = "ABCDEFGHIJKLMNO"
+    r1 = "".join(f'<c r="{cols[i]}1" t="s"><v>{i}</v></c>' for i in range(15))
+    nums = [100, 101, 105, 99, 104, 104.5, 103, 1000, 10.3, 50, 600, 60]
+    r2 = "".join(f'<c r="{cols[i]}2" t="s"><v>{15 + i}</v></c>' for i in range(3))
+    r2 += "".join(f'<c r="{cols[3 + i]}2"><v>{v}</v></c>' for i, v in enumerate(nums))
+    sheet = f'<worksheet {m}><sheetData><row r="1">{r1}</row><row r="2">{r2}</row></sheetData></worksheet>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/sharedStrings.xml", sst)
+        z.writestr("xl/worksheets/sheet1.xml", sheet)
+    rows = nse.parse_bhavcopy(nse.bhavcopy_text(buf.getvalue()))
+    assert len(rows) == 1
+    r = rows[0]
+    assert (r["date"], r["symbol"], r["series"], r["close"], r["volume"], r["deliv_pct"]) == \
+        ("2022-08-08", "ABC", "EQ", 104.5, 1000, 60.0)

@@ -74,6 +74,46 @@ def bhavcopy_url(day):
     return f"{ARCHIVE}/products/content/sec_bhavdata_full_{day:%d%m%Y}.csv"
 
 
+def xlsx_to_csv(content):
+    """NSE occasionally publishes a bhavcopy as .xlsx under the .csv name (e.g. 2022-08-08).
+    Minimal reader (first sheet, shared strings + numbers) -> CSV text; stdlib only."""
+    import zipfile
+    ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    z = zipfile.ZipFile(io.BytesIO(content))
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET.fromstring(z.read("xl/sharedStrings.xml")).findall("m:si", ns):
+            shared.append("".join(t.text or "" for t in si.iter(f"{{{ns['m']}}}t")))
+    out = io.StringIO()
+    w = csv.writer(out)
+    for row in ET.fromstring(z.read("xl/worksheets/sheet1.xml")).iter(f"{{{ns['m']}}}row"):
+        vals = {}
+        for c in row.findall("m:c", ns):
+            col = 0
+            for ch in re.match(r"[A-Z]+", c.get("r")).group():
+                col = col * 26 + ord(ch) - 64
+            v = c.find("m:v", ns)
+            if c.get("t") == "inlineStr":
+                txt = "".join(t.text or "" for t in c.iter(f"{{{ns['m']}}}t"))
+            elif v is None:
+                txt = ""
+            elif c.get("t") == "s":
+                txt = shared[int(v.text)]
+            else:
+                txt = v.text
+            vals[col - 1] = txt
+        if vals:
+            w.writerow([vals.get(i, "") for i in range(max(vals) + 1)])
+    return out.getvalue()
+
+
+def bhavcopy_text(content):
+    """Response bytes -> CSV text, whatever format NSE served."""
+    if content[:2] == b"PK":
+        return xlsx_to_csv(content)
+    return content.decode("utf-8", errors="replace")
+
+
 def parse_bhavcopy(text, symbols=None, series=("EQ", "BE")):
     rows = []
     reader = csv.reader(io.StringIO(text))
