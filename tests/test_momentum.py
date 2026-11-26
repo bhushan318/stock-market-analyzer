@@ -91,3 +91,24 @@ def test_lever_fit_recovers_known_betas():
     r = fit(y, X)
     assert abs(r["b_nifty"] - 1.1) < 0.05 and abs(r["b_crude"] + 0.3) < 0.05 and abs(r["b_usdinr"]) < 0.05
     assert r["t_crude"] < -10
+
+
+def test_delivery_signals_have_no_lookahead():
+    from trader.delivery_study import delivery_signals
+    C, V, _ = _panel()
+    rng = np.random.default_rng(2)
+    D = pd.DataFrame(rng.uniform(20, 80, C.shape), index=C.index, columns=C.columns)
+    TO = V * C / 1e7 * 5
+    uni = C.notna()
+    d = C.index[300]
+    C2, V2, D2 = C.copy(), V.copy(), D.copy()
+    after = C.index > d
+    C2.loc[after] *= 2.0
+    V2.loc[after] *= 10.0
+    D2.loc[after] = 99.0
+    s1, e1 = delivery_signals(C, V, TO, D, uni)
+    s2, e2 = delivery_signals(C2, V2, V2 * C2 / 1e7 * 5, D2, uni)
+    pd.testing.assert_series_equal(e1.loc[d], e2.loc[d])
+    for k in s1:
+        assert s1[k].loc[d].notna().all(), k
+        pd.testing.assert_series_equal(s1[k].loc[d], s2[k].loc[d])

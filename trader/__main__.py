@@ -194,6 +194,11 @@ def cmd_momentum_pit(cfg, args):
     run_momentum_pit(cfg)
 
 
+def cmd_delivery(cfg, args):
+    from .delivery_study import run_delivery
+    run_delivery(cfg)
+
+
 def cmd_levers(cfg, args):
     from .levers import run_levers
     run_levers(cfg)
@@ -216,6 +221,7 @@ def main():
     sub.add_parser("universe")
     sub.add_parser("momentum", help="Gate 0 step 1: momentum / relative strength study")
     sub.add_parser("levers", help="Gate 0 step 4: lever sensitivities (crude, USD/INR, gold, rates)")
+    sub.add_parser("delivery", help="Gate 0 step 2: delivery %% signals (point-in-time universe)")
     sub.add_parser("momentum-pit", help="Gate 0 step 1 without survivorship bias (NSE bhavcopy universe)")
     c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status / export)")
     c.add_argument("job", choices=["daily", "news", "backfill", "status", "export"])
@@ -235,7 +241,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "levers": cmd_levers, "collect": cmd_collect}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "levers": cmd_levers, "collect": cmd_collect}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

@@ -64,22 +64,19 @@ def concentration(trades, cols, top=10):
             "rest_pnl": pnl[order[top:]].sum(), "best5": best}
 
 
-def run_momentum_pit(cfg):
-    costs, capital = cfg["costs"], cfg["capital"]
+def load_context(cfg):
+    """Panel + universes + benchmarks + rebalance dates, shared by every point-in-time study."""
     print("Loading point-in-time panel from data/market.db ...", flush=True)
     p = load_panel()
-    O, C, TO, cal = p["O"], p["C"], p["TO"], p["cal"]
-    days_per_sym = C.notna().sum()
+    C, cal = p["C"], p["cal"]
     print(f"  {len(cal)} sessions {cal[0].date()} -> {cal[-1].date()}, {C.shape[1]} stocks, "
           f"{len(p['events'])} split/bonus events, {len(p['delisted'])} stopped trading before the end")
     full_days = (C.notna().sum(axis=1) >= 1000).mean()
     if full_days < 0.95:
         print(f"  !! only {full_days:.0%} of sessions have all stocks - is the backfill finished?")
-
     n500 = pd.read_csv(ROOT / "universes" / "nifty500_2026-11.csv")["Symbol"].str.strip()
-    universes = {"point-in-time top500": liquid_universe(C, TO),
+    universes = {"point-in-time top500": liquid_universe(C, p["TO"]),
                  "today's Nifty 500": C.notna() & C.columns.isin(n500)[None, :]}
-
     dc = cfg["data"]
     bp = download_prices(list(BENCH.values()), dc["start"], ROOT / dc["cache_dir"], dc["max_cache_age_hours"])
     bench = {k: bp[t]["Close"].reindex(cal).ffill() for k, t in BENCH.items() if t in bp}
@@ -96,18 +93,32 @@ def run_momentum_pit(cfg):
             if b - a >= 200 * y:  # skip windows that fall into a hole in the data
                 windows.append((y, s0, a, b))
 
-    def bench_cagr(key, a, b):
-        x = bench.get(key)
-        if x is None or np.isnan(x.iloc[a]):
-            return np.nan
-        return (x.iloc[b - 1] / x.iloc[a]) ** (248 / (b - a)) - 1
+    return {"p": p, "universes": universes, "bench": bench, "rebal": rebal, "rebal_idx": rebal_idx,
+            "periods": periods, "windows": windows, "i_start": i_start, "i_end": i_end}
 
+
+def bench_cagr(bench, key, a, b):
+    x = bench.get(key)
+    if x is None or np.isnan(x.iloc[a]):
+        return np.nan
+    return (x.iloc[b - 1] / x.iloc[a]) ** (248 / (b - a)) - 1
+
+
+def run_pit_study(cfg, ctx, make_signals, variants, prefix, universes=None):
+    """Signal test + 5-stock portfolio vs random picks vs Nifty 500 for every (signal, exit, no-loss)
+    variant. make_signals(p, universe) -> ({name: date x symbol score, NaN = not eligible}, elig).
+    Writes outputs/{prefix}_*.csv and prints the report."""
+    costs, capital = cfg["costs"], cfg["capital"]
+    p, bench, rebal, rebal_idx = ctx["p"], ctx["bench"], ctx["rebal"], ctx["rebal_idx"]
+    periods, windows, i_start, i_end = ctx["periods"], ctx["windows"], ctx["i_start"], ctx["i_end"]
+    O, C = p["O"], p["C"]
+    uni_sel = {k: v for k, v in ctx["universes"].items() if universes is None or k in universes}
     out_dir = ROOT / cfg["backtest"]["output_dir"]
     out_dir.mkdir(exist_ok=True)
     Oa, Cf = O.to_numpy(), C.ffill().to_numpy()
     ST, P, W, CONC = [], [], [], []
-    for uname, uni in universes.items():
-        sig, elig = pit_signals(C, TO, uni)
+    for uname, uni in uni_sel.items():
+        sig, elig = make_signals(p, uni)
         print(f"\n######## Universe: {uname}  (avg eligible per week: {elig.loc[rebal].sum(axis=1).mean():.0f})")
         st, _ = signal_test(sig, O, C, rebal)
         st = st.rename(index={"learn 2016-23": "learn 2021-23"})
@@ -121,7 +132,7 @@ def run_momentum_pit(cfg):
         print(show.to_string())
 
         orders = {k: _orders(s, rebal_idx) for k, s in sig.items()}
-        for name, ex, nl in VARIANTS:
+        for name, ex, nl in variants:
             label = _label(name, ex, nl)
             print(f"  running {label} ...", flush=True)
             od = orders[name]
@@ -144,18 +155,17 @@ def run_momentum_pit(cfg):
         for k in bench:
             x = bench[k].iloc[a:b]
             P.append({"universe": "-", "variant": f"BENCH {k}", "kind": "bench", "period": pname,
-                      "cagr": bench_cagr(k, a, b), "max_dd": float((x / x.cummax() - 1).min())})
+                      "cagr": bench_cagr(bench, k, a, b), "max_dd": float((x / x.cummax() - 1).min())})
     for y, s0, a, b in windows:
         for k in bench:
             W.append({"universe": "-", "variant": f"BENCH {k}", "kind": "bench", "years": y,
-                      "start": s0.date(), "cagr": bench_cagr(k, a, b)})
+                      "start": s0.date(), "cagr": bench_cagr(bench, k, a, b)})
 
     ST, P, W, CONC = pd.concat(ST), pd.DataFrame(P), pd.DataFrame(W), pd.DataFrame(CONC)
-    ST.to_csv(out_dir / "mompit_signal_test.csv")
-    P.to_csv(out_dir / "mompit_portfolio.csv", index=False)
-    W.to_csv(out_dir / "mompit_windows.csv", index=False)
-    CONC.to_csv(out_dir / "mompit_concentration.csv", index=False)
-    p["events"].to_csv(out_dir / "mompit_split_events.csv", index=False)
+    ST.to_csv(out_dir / f"{prefix}_signal_test.csv")
+    P.to_csv(out_dir / f"{prefix}_portfolio.csv", index=False)
+    W.to_csv(out_dir / f"{prefix}_windows.csv", index=False)
+    CONC.to_csv(out_dir / f"{prefix}_concentration.csv", index=False)
 
     print(f"\n=== B. Portfolio: {N_POS} stocks, Rs {capital:,}, weekly rotation, after all charges "
           "(dividends not included) ===")
@@ -183,7 +193,7 @@ def run_momentum_pit(cfg):
                          "beats_random": (r > rnd).mean(), "median_vs_random": (r - rnd).median(),
                          "beats_nifty500": (r > b).mean(), "median_vs_nifty500": (r - b).median()})
     S = pd.DataFrame(summ)
-    S.to_csv(out_dir / "mompit_rolling_summary.csv", index=False)
+    S.to_csv(out_dir / f"{prefix}_rolling_summary.csv", index=False)
     show = S.copy()
     for c in show.columns[4:]:
         show[c] = show[c].map(lambda v: "" if pd.isna(v) else f"{v:+.1%}")
@@ -194,13 +204,27 @@ def run_momentum_pit(cfg):
         print(f"  {r.universe:22s} {r.variant:24s} {r.trades:4d} trades | total Rs {r.total_pnl:>10,.0f} | "
               f"best 10 Rs {r.top10_pnl:>10,.0f} | other Rs {r.rest_pnl:>10,.0f} | best: {r.best5}")
 
+    print(f"\nCSV files in {out_dir}/{prefix}_*.csv. Returns before 20% STCG and without dividends.")
+    return P, S
+
+
+def _mom_signals(p, uni):
+    return pit_signals(p["C"], p["TO"], uni)
+
+
+def run_momentum_pit(cfg):
+    ctx = load_context(cfg)
+    p, bench, rebal_idx, i_end = ctx["p"], ctx["bench"], ctx["rebal_idx"], ctx["i_end"]
+    p["events"].to_csv(ROOT / cfg["backtest"]["output_dir"] / "mompit_split_events.csv", index=False)
+    run_pit_study(cfg, ctx, _mom_signals, VARIANTS, "mompit")
+    C, cal, costs, capital = p["C"], p["cal"], cfg["costs"], cfg["capital"]
+    Oa, Cf = p["O"].to_numpy(), C.ffill().to_numpy()
     if "mom30_etf" in bench:
         e = bench["mom30_etf"].dropna()
         a = cal.searchsorted(e.index[0])
         print(f"\n--- vs Nifty 200 Momentum 30 ETF since {e.index[0].date()} ---")
-        print(f"  ETF {bench_cagr('mom30_etf', a, i_end):+.1%} | Nifty 500 {bench_cagr('nifty500', a, i_end):+.1%}")
-        for uname, uni in universes.items():
-            sig, _ = pit_signals(C, TO, uni)
+        print(f"  ETF {bench_cagr(bench, 'mom30_etf', a, i_end):+.1%} | Nifty 500 {bench_cagr(bench, 'nifty500', a, i_end):+.1%}")
+        for uname, uni in ctx["universes"].items():
+            sig, _ = pit_signals(C, p["TO"], uni)
             r = stats(simulate(Oa, Cf, _orders(sig["mom12_1"], rebal_idx), a, i_end, capital, costs), capital)
             print(f"  mom12_1 exit>20 on {uname:22s} {r['cagr']:+.1%}  maxDD {r['max_dd']:.1%}")
-    print(f"\nCSV files in {out_dir}/mompit_*.csv. Returns before 20% STCG and without dividends.")

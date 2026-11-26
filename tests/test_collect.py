@@ -79,18 +79,28 @@ def test_pit_symbol_changes_and_split_adjustment():
     import pandas as pd
     from trader.pit import adjustment_multiplier, apply_symbol_changes, split_events
     d = pd.to_datetime(["2021-01-04", "2021-01-05", "2021-01-06", "2021-01-07"])
+    # 1:5 split effective 2021-01-06; NSE's prev_close is NOT adjusted (as in the real files),
+    # the stock opens at 20.6 (gap 0.206 -> snaps to 1/5) and rallies to 23 that day
     df = pd.DataFrame({"date": d, "symbol": ["OLD", "OLD", "NEW", "NEW"],
-                       # 1:5 split effective 2021-01-06: prev_close shows the adjusted 100/5
-                       "prev_close": [99.0, 100.0, 20.0, 21.0], "close": [100.0, 100.0, 21.0, 22.0]})
+                       "prev_close": [99.0, 100.0, 100.0, 23.0], "open": [99.0, 100.0, 20.6, 23.0],
+                       "close": [100.0, 100.0, 23.0, 22.0]})
     df = apply_symbol_changes(df, [("OLD", "NEW", pd.Timestamp("2021-01-06"))])
     assert set(df["symbol"]) == {"NEW"}
     ev = split_events(df)
     assert len(ev) == 1 and abs(ev.factor[0] - 0.2) < 1e-9 and ev.date[0] == d[2]
     M = adjustment_multiplier(ev, pd.DatetimeIndex(d), ["NEW"])
     assert list(M["NEW"]) == [0.2, 0.2, 1.0, 1.0]
-    # a 10% gap (missed Saturday session) is not a split
-    df.loc[2, "prev_close"] = 90.0
+    # a 10% opening gap (missed Saturday session, news) is not a split
+    df.loc[2:, ["open", "close"]] = [[90.0, 92.0], [92.0, 93.0]]
     assert split_events(df).empty
+    # an intraday crash (opens flat, closes -30%) is not a split either
+    df.loc[2:, ["open", "close"]] = [[99.0, 70.0], [70.0, 68.0]]
+    assert split_events(df).empty
+    # a demerger-like gap with no clean ratio keeps its own factor
+    from trader.pit import snap_ratio
+    assert abs(snap_ratio([0.605])[0] - 0.6) < 1e-9      # 2:3 bonus / demerger near 3/5
+    assert abs(snap_ratio([0.45])[0] - 0.45) < 1e-9      # no clean ratio nearby: keep the gap
+    assert abs(snap_ratio([0.198])[0] - 0.2) < 1e-9      # IRCTC 1:5 split opened at 0.198
 
 
 def test_export_snapshot_roundtrip(tmp_path):
