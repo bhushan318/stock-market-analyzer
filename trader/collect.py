@@ -1,7 +1,7 @@
 """Daily data collection jobs (run by systemd timers on the Pi, or by hand).
 
     python -m trader collect daily              # bhavcopy (+ catch-up), deals, FII/DII
-    python -m trader collect news               # announcements + results RSS (+ FII/DII)
+    python -m trader collect news               # announcements + results RSS (+ deals, FII/DII)
     python -m trader collect backfill --start 2020-01-01
     python -m trader collect status
 """
@@ -118,16 +118,22 @@ def run_daily(cfg, day=None):
             n = collect_bhavcopy(con, client, d, symbols)
             if n is not None:
                 report[d.isoformat()] = n
+    collect_deals(con, client, report)
+    collect_fii_dii(con, client, report)
+    return report
+
+
+def collect_deals(con, client, report):
+    """bulk.csv / block.csv hold only the latest session and can appear after the 19:30 run
+    (2026-11-26's were missed), so the hourly news job calls this too; upserts are idempotent."""
     for kind in ("bulk", "block"):
         try:
             rows = nse.parse_deals(client.get(f"{nse.ARCHIVE}/content/equities/{kind}.csv").text, kind)
             report[kind] = upsert(con, "deals", rows)
-            log(con, kind, "", "ok", report[kind])
+            log(con, kind, ",".join(sorted({r["date"] for r in rows})), "ok", report[kind])
         except Exception as e:
             log(con, kind, "", "error", 0, str(e))
             report[kind] = f"error: {e}"
-    collect_fii_dii(con, client, report)
-    return report
 
 
 def collect_fii_dii(con, client, report):
@@ -159,6 +165,7 @@ def run_news(cfg):
         except Exception as e:
             log(con, feed, "", "error", 0, str(e))
             report[feed] = f"error: {e}"
+    collect_deals(con, client, report)
     collect_fii_dii(con, client, report)
     return report
 
