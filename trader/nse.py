@@ -194,6 +194,16 @@ def parse_equity_list(text):
     return out
 
 
+def parse_pubdate(text):
+    """NSE RSS pubDate -> ISO; seen as '25-Nov-2026 21:25:48' and '26-NOV-2026 19:38'."""
+    for fmt in ("%d-%b-%Y %H:%M:%S", "%d-%b-%Y %H:%M"):
+        try:
+            return datetime.strptime(text, fmt).isoformat()
+        except ValueError:
+            pass
+    return text
+
+
 def parse_rss(xml_text, feed, name_to_symbol=None, fetched_at=""):
     root = ET.fromstring(xml_text)
     rows = []
@@ -201,10 +211,7 @@ def parse_rss(xml_text, feed, name_to_symbol=None, fetched_at=""):
         get = lambda tag: (it.findtext(tag) or "").strip()  # noqa: E731
         desc = get("description")
         subject = desc.split("|SUBJECT:", 1)[1].strip() if "|SUBJECT:" in desc else ""
-        try:
-            published = datetime.strptime(get("pubDate"), "%d-%b-%Y %H:%M:%S").isoformat()
-        except ValueError:
-            published = get("pubDate")
+        published = parse_pubdate(get("pubDate"))
         company = get("title")
         rows.append({
             "link": get("link"), "feed": feed, "published": published, "company": company,

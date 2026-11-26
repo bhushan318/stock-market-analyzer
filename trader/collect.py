@@ -1,7 +1,7 @@
 """Daily data collection jobs (run by systemd timers on the Pi, or by hand).
 
     python -m trader collect daily              # bhavcopy (+ catch-up), deals, FII/DII
-    python -m trader collect news               # announcements + results RSS
+    python -m trader collect news               # announcements + results RSS (+ FII/DII)
     python -m trader collect backfill --start 2020-01-01
     python -m trader collect status
 """
@@ -126,14 +126,21 @@ def run_daily(cfg, day=None):
         except Exception as e:
             log(con, kind, "", "error", 0, str(e))
             report[kind] = f"error: {e}"
+    collect_fii_dii(con, client, report)
+    return report
+
+
+def collect_fii_dii(con, client, report):
+    """NSE's API only shows the latest session and publishes it some time in the evening (not
+    yet out at 19:31 on 2026-11-26), so the hourly news job calls this too; replace=True makes
+    repeat fetches harmless."""
     try:
         rows = nse.parse_fii_dii(client.get(f"{nse.WWW}/api/fiidiiTradeReact", api=True).json())
         report["fii_dii"] = upsert(con, "fii_dii", rows, replace=True)
-        log(con, "fii_dii", "", "ok", report["fii_dii"])
+        log(con, "fii_dii", ",".join(sorted({r["date"] for r in rows})), "ok", report["fii_dii"])
     except Exception as e:
         log(con, "fii_dii", "", "error", 0, str(e))
         report["fii_dii"] = f"error: {e}"
-    return report
 
 
 def run_news(cfg):
@@ -152,6 +159,7 @@ def run_news(cfg):
         except Exception as e:
             log(con, feed, "", "error", 0, str(e))
             report[feed] = f"error: {e}"
+    collect_fii_dii(con, client, report)
     return report
 
 

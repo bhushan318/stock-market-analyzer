@@ -51,6 +51,9 @@ def test_parse_rss_maps_company_to_symbol():
     assert rows[0]["symbol"] == "TCS" and rows[0]["subject"] == "Outcome of Board Meeting"
     assert rows[0]["published"] == "2026-11-25T21:25:48"
     assert rows[1]["symbol"] is None and rows[1]["subject"] == ""
+    # NSE sometimes drops the seconds and upper-cases the month
+    assert nse.parse_pubdate("26-NOV-2026 19:38") == "2026-11-26T19:38:00"
+    assert nse.parse_pubdate("garbage") == "garbage"
 
 
 def test_upsert_is_idempotent(tmp_path):

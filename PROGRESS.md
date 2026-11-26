@@ -179,7 +179,16 @@ Checklist after the reset:
 - [ ] deploy key + `github-sma` alias, old key removed on GitHub
 - [ ] `setup_pi.sh` ran: tests pass (22 on the PC), timers listed
 - [x] `setup_pi.sh` ran on the Pi 2026-11-26: 22 tests pass, 8 days x ~2,950 symbols, timers on
-- [ ] `move_data_to_ehd.sh`: data on `/mnt/sma` (external disk), PC news merged, backfill started
+- [x] PC news/deals/FII-DII merged into the Pi DB (announcements now from 2026-11-03)
+- [x] backfill started 2026-11-26 21:30 IST in tmux `backfill`, DB still on the flash disk
+      (`data/backfill.log`); fine there (no symbol index, ~0.7 GB of 4.8 GB free)
+- [ ] external disk: first attempt hung — Seagate Expansion (0bc2:2036) under the UAS driver never
+      completed a cache flush. Fixed with `usb-storage.quirks=0bc2:2036:u` in
+      /boot/firmware/cmdline.txt (backup `cmdline.txt.bak-uas`). `fsck.exfat -n` then found real
+      exFAT damage (cross-linked clusters, a corrupted folder) - likely from the old flush failures.
+      Owner is repairing it on Windows (chkdsk /f). After that: delete `pi-data/sma.img.tmp`,
+      run `deploy/move_data_to_ehd.sh` (needs sudo password) - it moves data/ into the ext4 image.
+      Only ever touch `pi-data/` on that disk; it holds the owner's personal files.
 - [ ] reboot test: `/mnt/sma` mounts by itself
 - [ ] backfill + `--weekends` finished; `collect status` shows ~1,700+ days
 - [ ] Claude Code reinstalled
