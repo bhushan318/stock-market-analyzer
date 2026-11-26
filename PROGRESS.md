@@ -158,9 +158,19 @@ FII/DII, deals and news are not (only from the day they are collected), so get t
    less setup_pi.sh        # read it before running
    bash setup_pi.sh
    ```
-4. **Optional restore** from the PC copy (news 2026-11-03..25, FII/DII + deals 2026-11-25), before the backfill.
-   On the PC: `scp data/market.db <user>@<pi-ip>:~/stock-market-analyzer/data/market.db`
-5. **Backfill** (~3 h, resumes if interrupted; weekend special sessions afterwards) — command printed by setup_pi.sh.
+4. **Data on the external disk + PC merge + backfill, one command.** The Pi now has a 1.4 TB
+   external HDD (exFAT, label "Bhushan", mounted at `/mnt/ehd`, shared with other files). SQLite
+   is safest on ext4, so `deploy/move_data_to_ehd.sh` makes a 10 GB ext4 image
+   `/mnt/ehd/pi-data/sma.img`, loop-mounts it at `/mnt/sma` (fstab, nofail), moves `data/` to
+   `/mnt/sma/sma-data` and leaves `data` as a symlink (disk missing → collectors fail loudly,
+   never fill the flash). If `~/pc_market.db` exists it merges its news/deals/FII-DII
+   (INSERT OR IGNORE — never scp the PC DB over the Pi's: that would wipe Pi data).
+   Then it starts the backfill in tmux (log: `data/backfill.log`).
+   ```bash
+   # on the PC (optional, older news 2026-11-03..25): scp data/market.db bhushan@<pi-ip>:~/pc_market.db
+   cd ~/stock-market-analyzer && git pull && bash deploy/move_data_to_ehd.sh
+   ```
+5. **Backfill** (~3 h, resumes if interrupted; weekend special sessions afterwards) — started by step 4.
 6. `.env` with `GEMINI_API_KEY` when created (`chmod 600`).
 7. Claude Code on the Pi: reinstall per Anthropic's docs, log in, start it in `~/stock-market-analyzer`.
 
@@ -168,7 +178,9 @@ Checklist after the reset:
 - [ ] 64-bit OS, SSH
 - [ ] deploy key + `github-sma` alias, old key removed on GitHub
 - [ ] `setup_pi.sh` ran: tests pass (22 on the PC), timers listed
-- [ ] (optional) PC `market.db` copied over
+- [x] `setup_pi.sh` ran on the Pi 2026-11-26: 22 tests pass, 8 days x ~2,950 symbols, timers on
+- [ ] `move_data_to_ehd.sh`: data on `/mnt/sma` (external disk), PC news merged, backfill started
+- [ ] reboot test: `/mnt/sma` mounts by itself
 - [ ] backfill + `--weekends` finished; `collect status` shows ~1,700+ days
 - [ ] Claude Code reinstalled
 - [ ] Gemini key in `.env` (owner, still not created)
