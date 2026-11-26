@@ -100,8 +100,16 @@ def signal_test(sig, O, C, rebal):
 # ---------------------------------------------------------------- B. portfolio simulator
 
 def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss=False,
-             rng=None, hold_dist=None, stuck_days=60, min_val=1500):
+             rng=None, hold_dist=None, stuck_days=60, min_val=1500,
+             regime=None, regime_exit=False, target=None, stop_k=None, vol=None):
     """Weekly rotation. O, C: numpy (T x N); C forward-filled for marking.
+
+    Optional rules (all off by default; applied the same way in random mode):
+      regime      bool array (T): on a rebalance day where it is False, no new buys
+                  (regime_exit=True also sells everything held).
+      target      sell when the position is up this much after all charges (checked every close).
+      stop_k, vol sell when the close falls below buy price x (1 - stop_k * vol * sqrt(20)), with
+                  vol = T x N daily-return std known on the decision day (checked every close).
 
     order: {day index -> np.array of column indices, best first (eligible only)} on rebalance days.
     Random mode (rng + hold_dist given): picks are random eligible stocks, each held for a period
@@ -113,6 +121,7 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
     cash = float(capital)
     pos = {}  # j -> [shares, cost_basis, buy_i, hold_days]
     sells, buys = set(), []
+    stop_px = {}
     eq, stuck, trades = [], [], []
     charges = 0.0
     prev_equity = cash
@@ -150,6 +159,9 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
                 cash -= sh * px + ch
                 charges += ch
                 pos[j] = [sh, sh * px + ch, i, hold]
+                if stop_k is not None:
+                    v0 = vol[i - 1, j]
+                    stop_px[j] = px * (1 - stop_k * (v0 if v0 == v0 else 0.03) * math.sqrt(20))
             buys = []
         held, stk = 0.0, 0.0
         for j, (sh, basis, bi, _) in pos.items():
@@ -161,7 +173,22 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
         prev_equity = equity
         eq.append(equity)
         stuck.append(stk / equity)
+        if (target is not None or stop_k is not None) and i + 1 < i1:
+            for j, (sh, basis, bi, _) in pos.items():
+                if j in sells:
+                    continue
+                c = C[i, j]
+                if stop_k is not None and c < stop_px.get(j, -1):
+                    sells.add(j)
+                elif target is not None:
+                    v = sh * c * (1 - slip)
+                    if v - sell_charges(v, costs) >= basis * (1 + target):
+                        sells.add(j)
         if i not in order or i + 1 >= i1:
+            continue
+        if regime is not None and not regime[i]:
+            if regime_exit:
+                sells.update(pos)
             continue
         ranked = order[i]
         rank = {j: r for r, j in enumerate(ranked)}

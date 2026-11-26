@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-26 (Gate 0 on point-in-time data: Results 7).
+Last updated: 2026-11-26 (Results 8: combo variants).
 
 ## Where we are
 
@@ -8,7 +8,10 @@ Last updated: 2026-11-26 (Gate 0 on point-in-time data: Results 7).
 the PC. Gate 0 run on point-in-time data (Results 7): only the momentum "combo" ranking beats
 random picks and Nifty 500 in every 3-year window, but with a −42% drawdown, a smaller edge in
 2024+, and heavy charges at Rs 20k. Levers and delivery % alone: no stock-picking edge.
-Next: lower-turnover combo variants, Rs 1 lakh, exit-rule comparison (see NEXT).**
+Results 8 (18 combo variants): the market filter "no new buys while Nifty 500 < 200-day avg"
+is the one change that helped consistently; slower rotation, Rs 1 lakh, stops and targets gave
+mixed, noisy results; never-sell-at-loss again weak. Every variant still falls 32-56% at worst.
+Next: robustness checks of combo + filter, then decide on Gate 1 paper trading (see NEXT).**
 
 ## The plan (agreed with the owner)
 
@@ -160,6 +163,42 @@ consumer durables and realty −0.23; metals +0.10 crude / +0.12 gold; US yields
 **Key practical finding: at Rs 20k, charges dominate any weekly-rotation strategy** (DP charge is
 0.4% of a Rs 4k sell). Test slower rotation (monthly, exit when out of top 50) and Rs 1 lakh.
 
+### 8. combo variants: turnover, capital, market filter, exits (2026-11-26, `python -m trader combo`)
+Point-in-time top 500, 5 stocks, 2021-01 -> 2026-11, after charges, no dividends, before STCG.
+Random control = random picks under the *same* rules (rebalance days, filter, stops). Nifty 500:
+13.3%/yr full, 19.1% learn, 7.7% check, max DD −19%; Rs 20k -> ~Rs 42k.
+W/M = weekly/monthly ranking, 20/50 = sell when out of the top 20/50.
+
+| variant | Rs 20k -> | full | random | check 2024+ | max DD | trades/yr | charges/yr | 3y beat random / N500 | worst 3y |
+|---|---|---|---|---|---|---|---|---|---|
+| W20 (Results 7) | 1.01 L | 32% | 9% | 13% | −42% | 59 | 12% | 100% / 100% | +17% |
+| W50 | 1.35 L | 38% | 11% | 1% | −44% | 27 | 6% | 75% / 92% | +7% |
+| M20 | 0.77 L | 26% | 8% | −6% | −51% | 29 | 5% | 50% / 58% | +4% |
+| M50 | 0.90 L | 29% | 19% | 8% | −54% | 16 | 3% | 75% / 83% | +10% |
+| **W50 + filter (block buys)** | **1.74 L** | **44%** | 19% | **11%** | **−36%** | 25 | 6% | **100% / 100%** | +15% |
+| M50 + filter (block buys) | 1.70 L | 44% | 12% | 30% | −49% | 14 | 3% | 92% / 100% | +15% |
+| W50 + filter (sell all) | 0.66 L | 23% | 10% | −3% | −43% | 30 | 6% | 92% / 92% | +9% |
+| W50 never-sell-at-loss | 0.53 L | 18% | 6% | 2% | −30% | 5 | 1% | 75% / 67% | +1% |
+| W50 + vol stop | 1.57 L | 42% | 14% | 1% | −43% | 27 | 6% | 83% / 92% | +5% |
+| W50 +15% target + stop | 0.32 L | 8% | 15% | −1% | −50% | 24 | 3% | 50% / 33% | −5% |
+| M50 +15% target + stop | 0.84 L | 28% | 17% | 12% | −32% | 21 | 4% | 92% / 100% | +19% |
+Rs 1 lakh (same rules): W20 34% (charges 9%/yr), W50 39%, M20 25%, M50 30% - a little better
+than Rs 20k, within path noise (W20 check 2024+: 13% at 20k vs 8% at 1 lakh just from rounding
+of share counts -> treat ±5%/yr differences between variants as noise).
+
+Reading (honest):
+- 18 variants on one dataset: the best one is flattered by selection. Only conclusions that hold
+  across several variants are trusted:
+  - **Market filter "block new buys"** helps in both W50 and M50 (higher return, check 2024+
+    better, 1y losing windows 30% -> 20% for W50). "Sell everything" on the filter hurts (whipsaw).
+  - Slower rotation cuts charges (12% -> 3-6%/yr of Rs 20k) but does not reliably raise returns.
+  - Never-sell-at-loss: low returns, 34-40% of capital stuck. Rejected again by data.
+  - Stops/targets: inconsistent between weekly and monthly -> no conclusion.
+- Profit still depends on a few big winners (top 10 trades > 100% of total profit in most
+  variants; the rest roughly break even after charges).
+- Drawdowns of 32-56% in every variant vs 19% for the index. The owner says fear/greed is his
+  weak spot -> sizing / ETF core must be decided before Gate 1.
+
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
 `python -m trader collect daily|news|backfill|status` → `data/market.db` (SQLite):
@@ -276,14 +315,13 @@ speed: build catch-up checks, retries and failure alerts into Gate 1.
 
 ## NEXT: Gate 0 backtests (no LLM needed)
 
-Immediate (after Results 7):
-- combo with less churn: monthly rebalance and/or exit only when out of top 40-50; Rs 20k vs
-  Rs 1 lakh; track charges, drawdown and the share of profit from the top 10 trades.
-- combo + delivery accumulation as a 4th rank; combo with a market filter (Nifty 500 above its
-  200-day average) to cut the −42% drawdown.
-- Exit-rule comparison on combo: rank exit vs never-sell-at-loss vs target + volatility stop.
+Immediate (after Results 8) - robustness of "combo + block-buys filter" without re-tuning:
+- neighbours: exit rank 30/40, filter on 150/250-day average (results should change smoothly);
+- other universes: top 200 by turnover (large caps only) and top 300-500 only (mid/small);
+- core + satellite: e.g. 50% NIFTYBEES + 50% combo, to see the drawdown the owner would live with;
+- Gate 1 plan: paper-trade the chosen rule weekly from the Pi (Telegram), shadow list of top 20.
 - Results reactions (step 3) once announcements history is long enough (only Nov 2026 so far).
-- Data done: backfill complete; split detection fixed (Results 7).
+- Done: turnover/capital/filter/exit comparison (Results 8), split detection fixed (Results 7).
 
 Work on the Pi (studies take minutes; use nohup/tmux). For each signal: rank Nifty 500 stocks
 weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the top decile; compare

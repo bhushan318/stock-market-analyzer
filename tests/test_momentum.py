@@ -112,3 +112,31 @@ def test_delivery_signals_have_no_lookahead():
     for k in s1:
         assert s1[k].loc[d].notna().all(), k
         pd.testing.assert_series_equal(s1[k].loc[d], s2[k].loc[d])
+
+
+def test_target_stop_and_regime_rules():
+    costs = load_config()["costs"]
+    T = 15
+    order = {0: np.array([0, 1]), 7: np.array([0, 1])}
+    # target: stock 0 rises 30% on day 4 -> sold at day 5 open, no rank exit needed
+    O = _flat(T, [100, 100]); O[4:, 0] = 130
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, exit_rank=10**9, target=0.2)
+    assert len(r["trades"]) == 1 and r["trades"][0][4] == 5 and r["trades"][0][1] > 0.2
+    # stop: 2% daily vol x 2 x sqrt(20) = 17.9% below the buy price; a fall to 80 triggers it
+    O = _flat(T, [100, 100]); O[4:, 0] = 80
+    vol = np.full(O.shape, 0.02)
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, exit_rank=10**9, stop_k=2.0, vol=vol)
+    assert len(r["trades"]) == 1 and r["trades"][0][4] == 5 and r["trades"][0][1] < -0.18
+    # a fall to 85 stays above the stop
+    O[4:, 0] = 85
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, exit_rank=10**9, stop_k=2.0, vol=vol)
+    assert len(r["trades"]) == 0
+    # regime off on day 0: nothing bought until the day-7 rebalance (regime back on)
+    regime = np.ones(T, bool); regime[:7] = False
+    O = _flat(T, [100, 100])
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, regime=regime)
+    assert r["equity"][5] == 20000 and r["equity"][-1] < 20000
+    # regime_exit sells holdings when the filter turns off
+    regime = np.ones(T, bool); regime[7] = False
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, regime=regime, regime_exit=True)
+    assert len(r["trades"]) == 1 and r["trades"][0][4] == 8
