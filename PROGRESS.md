@@ -196,7 +196,7 @@ Reading (honest):
   - Stops/targets: inconsistent between weekly and monthly -> no conclusion.
 - Profit still depends on a few big winners (top 10 trades > 100% of total profit in most
   variants; the rest roughly break even after charges).
-- Drawdowns of 32-56% in every variant vs 19% for the index. The owner says fear/greed is his
+- Drawdowns of 32-56% in every variant vs 19% for the index. The owner says fear/greed is their
   weak spot -> sizing / ETF core must be decided before Gate 1.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
