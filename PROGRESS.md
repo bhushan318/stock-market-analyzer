@@ -1,13 +1,14 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-26 (Pi reset: rebuild steps in "Rebuild the Pi").
+Last updated: 2026-11-26 (Gate 0 on point-in-time data: Results 7).
 
 ## Where we are
 
-**Pi set up (2026-11-25), timers live, full-market backfill running. Gate 0 step 1 (momentum)
-first run was dominated by survivorship bias (Results 6); the point-in-time redo
-(`momentum-pit`) and the lever-beta study (`levers`) are written and tested but NOT yet run on
-real data. Research moves to the PC; the Pi collects and later runs the live system.**
+**2026-11-26: Pi rebuilt, backfill complete (1,714 days 2020-26, every NSE stock), DB copied to
+the PC. Gate 0 run on point-in-time data (Results 7): only the momentum "combo" ranking beats
+random picks and Nifty 500 in every 3-year window, but with a −42% drawdown, a smaller edge in
+2024+, and heavy charges at Rs 20k. Levers and delivery % alone: no stock-picking edge.
+Next: lower-turnover combo variants, Rs 1 lakh, exit-rule comparison (see NEXT).**
 
 ## The plan (agreed with the owner)
 
@@ -116,6 +117,48 @@ return, so not separate.) Weekly ranking, 499 stocks, ~400 eligible (>= Rs 2 cr 
 - Fix needed: point-in-time universe (NSE full bhavcopy incl. later-collapsed stocks, liquidity
   ranked each month, split/bonus adjusted) and/or the official Nifty 200 Momentum 30 index history
   (niftyindices.com, point-in-time by construction) as the honest benchmark.
+
+### 7. Gate 0 on point-in-time data (2026-11-26, PC, NSE bhavcopy 2020-01 -> 2026-11-26)
+Universe each week = top 500 stocks by 6-month median turnover at that date (incl. stocks that
+later collapsed/delisted: 366 stopped trading). 5 stocks, Rs 20k, weekly ranking, sell when out of
+the top 20, all charges, no dividends, before 20% STCG. Learn 2021-23 / check 2024+ (the 2024+
+period was already seen in Results 6, so it is only partly fresh).
+
+**Data bug found and fixed first:** NSE's PREV_CLOSE is *not* split-adjusted, so the first run
+detected only 14 splits in 7 years and every split looked like a crash. Now opening-gap detection
+(752 events; MAZDOCK, IRCTC, RELIANCE, CDSL, TMPV demerger checked). Rights entitlements (-RE)
+dropped. Remaining liquid moves >25%/day: 16 in 5M stock-days, all real (Adani, Zee, IndusInd...).
+
+Momentum (`momentum-pit`), CAGR full 2021-26 / check 2024+:
+| variant | rule | random | Nifty 500 | 3y windows beat random / Nifty 500 | max DD | trades/yr | charges/yr* |
+|---|---|---|---|---|---|---|---|
+| mom12_1 | 15.9% / 24.1% | 11.3% / 0.4% | 13.3% / 7.7% | 33% / 33% | −50% | 14 | 1.8% |
+| mom6_1 | 6.2% / 13.2% | 11.6% / 1.9% | | 50% / 50% | −62% | 23 | 2.7% |
+| **combo** (12-1, 6-1, 52w-high ranks) | **31.5% / 12.7%** | 9.0% / −4.5% | | **100% / 100%** (median +24% / +20%/yr) | −42% | 59 | 11.5% |
+| mom12_1 never-sell-at-loss | 11.5% / 11.3% | 10.1% / 4.0% | | 50% / 33% | −45% | 4 | 0.6% |
+\* charges as % of the *starting* Rs 20k per year.
+- Survivorship bias measured: random picks from *today's* Nifty 500 make 26%/yr vs 11% from the
+  point-in-time universe; mom12_1 52% vs 16%. Results 6 was mostly this bias.
+- combo is the only candidate: beats random and Nifty 500 in every 3-year window, both halves.
+  Caveats: 2024+ edge much smaller (+5%/yr vs Nifty 500); −42% drawdown (Nifty 500 −19%);
+  profit concentrated in ~10 big winners (CUPID, COCHINSHIP, MTARTECH, IRFC, MIRZAINT); 59
+  trades/yr cost 11.5% of Rs 20k per year (DP Rs 15.93 per sell on ~Rs 4k positions).
+- Nifty 200 Momentum 30 ETF since 2022-08: +9.0%/yr vs Nifty 500 +11.3% (the real index lagged).
+- Never-sell-at-loss again ~= random, 30-43% of holdings stuck.
+
+Delivery % (`delivery`, same harness): delivery on its own has no edge (deliv_rel +7%,
+accum −7%, dq_rel −17% full period; random −2%... all crushed by 145-160 trades/yr = 17-22%
+charges). **accum_mom** (delivery accumulation + 12-1 momentum): 21.0% vs random 3.7%, check
+12.6% vs −10.5%, beats random in 92% of 3y windows but Nifty 500 only 33%; 114 trades/yr.
+
+Levers (`levers`, Yahoo 2016-26, 361 stocks): per-stock betas to crude/USDINR/gold/US10y keep
+their sign between halves only 50-58% of the time (coin flip) -> useless for stock picking.
+Industry level, stable: pharma/healthcare +0.41% per +1% USDINR, FMCG +0.23, IT +0.20;
+consumer durables and realty −0.23; metals +0.10 crude / +0.12 gold; US yields ~0. Small effects
+-> lever maps are context for sector tilts, not a signal.
+
+**Key practical finding: at Rs 20k, charges dominate any weekly-rotation strategy** (DP charge is
+0.4% of a Rs 4k sell). Test slower rotation (monthly, exit when out of top 50) and Rs 1 lakh.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
@@ -233,11 +276,14 @@ speed: build catch-up checks, retries and failure alerts into Gate 1.
 
 ## NEXT: Gate 0 backtests (no LLM needed)
 
-Immediate:
-- Pi: wait for backfill (+ weekend sessions), then `collect export`, copy to the PC.
-- PC: `git pull`, `python -m trader levers` (Yahoo only, can run now), then `momentum-pit`.
-- Before trusting `momentum-pit`: spot-check `outputs/mompit_split_events.csv` and compare adjusted
-  closes with Yahoo for a few known splits.
+Immediate (after Results 7):
+- combo with less churn: monthly rebalance and/or exit only when out of top 40-50; Rs 20k vs
+  Rs 1 lakh; track charges, drawdown and the share of profit from the top 10 trades.
+- combo + delivery accumulation as a 4th rank; combo with a market filter (Nifty 500 above its
+  200-day average) to cut the −42% drawdown.
+- Exit-rule comparison on combo: rank exit vs never-sell-at-loss vs target + volatility stop.
+- Results reactions (step 3) once announcements history is long enough (only Nov 2026 so far).
+- Data done: backfill complete; split detection fixed (Results 7).
 
 Work on the Pi (studies take minutes; use nohup/tmux). For each signal: rank Nifty 500 stocks
 weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the top decile; compare
