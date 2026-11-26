@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-25 (session moved from the Windows PC to the Raspberry Pi after this).
+Last updated: 2026-11-26 (Pi reset: rebuild steps in "Rebuild the Pi").
 
 ## Where we are
 
@@ -129,28 +129,53 @@ return, so not separate.) Weekly ranking, 499 stocks, ~400 eligible (>= Rs 2 cr 
 - Holidays detected (NSE republishes the previous file); catch-up of last 10 weekdays each run.
 - systemd user timers: daily Mon-Fri 19:30 IST + Sat 10:00 catch-up; news hourly 07:00-23:00 IST.
 
-## Pi setup checklist (do these first on the Pi)
+## Rebuild the Pi (after a reset) — 2026-11-26
 
-```bash
-cd ~ && git clone -b swing-engine https://github.com/bhushan318/stock-market-analyzer.git   # or git pull
-cd ~/stock-market-analyzer
-python3 -m venv .venv && .venv/bin/pip install -r requirements-trader.txt
-.venv/bin/python -m pytest -q tests                      # expect 12 passed
-.venv/bin/python -m trader collect daily && .venv/bin/python -m trader collect news
-nohup .venv/bin/python -m trader collect backfill --start 2020-01-01 > backfill.log 2>&1 &
-bash deploy/install.sh                                   # timers; needs sudo for enable-linger
-.venv/bin/python -m trader collect status
-```
-- [x] Pi set up, tests pass (16 passed, Python 3.13, 2026-11-25)
-- [ ] Backfill finished. First run (Nifty 500 + ETFs only) died at 2022-01-20 when the Pi rebooted.
-  Restarted 22:45 IST 2026-11-25 with `store_all: true` (every EQ/BE stock, ~1,640/day in 2020,
-  est. ~500-700 MB) so a point-in-time universe is possible; days stored with <1,000 symbols are
-  re-fetched automatically. ~1,774 weekdays at ~10/min => ~3 h. If it dies, just rerun the same
-  command (it resumes): `nohup .venv/bin/python -u -m trader collect backfill --start 2020-01-01 > backfill.log 2>&1 &`
-- [x] Timers installed and confirmed firing (news fired 22:05 IST). Linger was already on.
-- [x] Git push from the Pi: deploy key `~/.ssh/github_sma` (write access, this repo only), remote `git@github-sma:bhushan318/stock-market-analyzer.git` (host alias in `~/.ssh/config`).
-- Disk: only ~1.8 GB free on the Pi SD card (14 GB, 87% used) - matters for an all-stocks bhavcopy store.
-- [ ] Gemini API key created and put in `.env` (owner)
+The Pi was reset on 2026-11-26: its `data/market.db` (backfill in progress + ~1 day of FII/DII,
+deals, news) was lost. Code/config/notes are all in GitHub. Prices + delivery are re-downloadable;
+FII/DII, deals and news are not (only from the day they are collected), so get the timers back fast.
+
+1. **OS:** Raspberry Pi OS **64-bit** (Lite is fine), SSH enabled, same username as before if possible.
+2. **Deploy key** (lets the Pi push to this repo only). On the Pi:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/github_sma -N "" -C "pi-stock-market-analyzer"
+   cat >> ~/.ssh/config <<'EOF'
+   Host github-sma
+       HostName github.com
+       User git
+       IdentityFile ~/.ssh/github_sma
+       IdentitiesOnly yes
+   EOF
+   chmod 600 ~/.ssh/config
+   cat ~/.ssh/github_sma.pub
+   ```
+   On GitHub: repo → Settings → Deploy keys → **delete the old Pi key** (its private half is gone
+   with the old SD card/stick) → Add deploy key → paste, tick **Allow write access**.
+   Test: `ssh -T github-sma` → "successfully authenticated".
+3. **Everything else, one command** (idempotent; clones if needed, venv, tests, first collection, timers):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/bhushan318/stock-market-analyzer/swing-engine/deploy/setup_pi.sh -o setup_pi.sh
+   less setup_pi.sh        # read it before running
+   bash setup_pi.sh
+   ```
+4. **Optional restore** from the PC copy (news 2026-11-03..25, FII/DII + deals 2026-11-25), before the backfill.
+   On the PC: `scp data/market.db <user>@<pi-ip>:~/stock-market-analyzer/data/market.db`
+5. **Backfill** (~3 h, resumes if interrupted; weekend special sessions afterwards) — command printed by setup_pi.sh.
+6. `.env` with `GEMINI_API_KEY` when created (`chmod 600`).
+7. Claude Code on the Pi: reinstall per Anthropic's docs, log in, start it in `~/stock-market-analyzer`.
+
+Checklist after the reset:
+- [ ] 64-bit OS, SSH
+- [ ] deploy key + `github-sma` alias, old key removed on GitHub
+- [ ] `setup_pi.sh` ran: tests pass (22 on the PC), timers listed
+- [ ] (optional) PC `market.db` copied over
+- [ ] backfill + `--weekends` finished; `collect status` shows ~1,700+ days
+- [ ] Claude Code reinstalled
+- [ ] Gemini key in `.env` (owner, still not created)
+
+Notes kept from the first setup: Python 3.13 on the Pi worked; linger must be on (install.sh does it);
+system disk is a USB flash stick with little free space — keep no extra index on eq_daily (see below);
+expect ~0.7 GB for the all-stocks DB.
 
 ## Workflow: PC for research, Pi for collection + live (decided 2026-11-25)
 
