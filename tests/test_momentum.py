@@ -140,3 +140,17 @@ def test_target_stop_and_regime_rules():
     regime = np.ones(T, bool); regime[7] = False
     r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=1, regime=regime, regime_exit=True)
     assert len(r["trades"]) == 1 and r["trades"][0][4] == 8
+
+
+def test_mix_equity_rebalances_to_weight():
+    from trader.robust_study import mix_equity
+    strat = [100, 200, 200]   # doubles on day 1
+    etf = [10, 10, 10]        # flat
+    e = mix_equity(strat, etf, 0.5, rebal_at=[1], fee=0.0)
+    assert list(e) == [1.0, 1.5, 1.5]
+    # all-in either side reproduces that side
+    assert np.allclose(mix_equity(strat, etf, 1.0, fee=0.0), [1, 2, 2])
+    assert np.allclose(mix_equity(strat, etf, 0.0, fee=0.0), [1, 1, 1])
+    # after a rebalance the next move applies to the reset weights
+    e = mix_equity([1, 2, 4], [1, 1, 1], 0.5, rebal_at=[1], fee=0.0)
+    assert np.isclose(e[2], 1.5 + 0.75)

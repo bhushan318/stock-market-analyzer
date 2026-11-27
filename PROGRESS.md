@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-26 (Results 8: combo variants).
+Last updated: 2026-11-27 (Results 9: robustness + core/satellite).
 
 ## Where we are
 
@@ -11,7 +11,11 @@ random picks and Nifty 500 in every 3-year window, but with a −42% drawdown, a
 Results 8 (18 combo variants): the market filter "no new buys while Nifty 500 < 200-day avg"
 is the one change that helped consistently; slower rotation, Rs 1 lakh, stops and targets gave
 mixed, noisy results; never-sell-at-loss again weak. Every variant still falls 32-56% at worst.
-Next: robustness checks of combo + filter, then decide on Gate 1 paper trading (see NEXT).**
+Results 9 (robustness, 2026-11-27): every neighbour of "W50 + filter" still beats random and
+Nifty 500 over 2021-26, but 2024+ returns scatter from 1% to 32%/yr and the filter's benefit is
+fragile (150-day filter = no filter in 2024+). Realistic expectation ~ index + 5%/yr, not 44%.
+Alone, the strategy fell >25% in 80% of 1-year windows; the owner's limit is 25% -> run it as a
+satellite next to a Nifty 500 ETF core. Next: owner picks the mix, then Gate 1 paper trading.**
 
 ## The plan (agreed with the owner)
 
@@ -199,6 +203,49 @@ Reading (honest):
 - Drawdowns of 32-56% in every variant vs 19% for the index. The owner says fear/greed is their
   weak spot -> sizing / ETF core must be decided before Gate 1.
 
+### 9. Robustness of "W50 + filter" + core/satellite (2026-11-27, `python -m trader robust`)
+One change at a time from the base (combo, weekly, exit out of top 50, no new buys below the
+200-day average, 5 stocks, Rs 20k, point-in-time top 500). Nifty 500: 13% full, 7.7% check.
+
+| variant | Rs 20k -> | full | random | learn 21-23 | check 24+ | random 24+ | max DD | 3y beat N500 | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|---|---|
+| base | 1.74 L | 44% | 19% | 78% | 11% | 0% | −36% | 100% | 80% |
+| exit 30 / 40 / 75 | 1.34 / 0.86 / 1.55 L | 38 / 28 / 42% | | 52 / 46 / 51% | 19 / 12 / 32% | | −33 / −42 / −42% | 100 / 100 / 50% | 85 / 90 / 70% |
+| filter 150d / 250d / none | 1.35 / 1.41 / 1.35 L | 38 / 39 / 38% | | 84 / 77 / 78% | 1 / 8 / 1% | | −35 / −42 / −44% | 100 / 92 / 92% | 60 / 80 / 75% |
+| 4 / 3 positions | 2.20 / 1.46 L | 50 / 40% | | 85 / 89% | 16 / 14% | | −37 / −57% | 100 / 83% | 80 / 90% |
+| decide Wednesday | 1.47 L | 40% | 8% | 50% | 26% | 4% | −43% | 100% | 55% |
+| top 200 only (large) | 1.13 L | 34% | 13% | 38% | 28% | 10% | −33% | 100% | 45% |
+| ranks 201-500 (mid/small) | 0.81 L | 27% | 15% | 57% | 1% | 2% | −35% | 83% | 75% |
+| base at Rs 1 lakh | 9.35 L | 46% | 19% | 80% | 21% | 7% | −35% | 100% | 80% |
+
+Core + satellite: w in the strategy, rest in a Nifty 500 ETF (0.2%/yr fee), reset each January.
+Strategy part simulated at its own (smaller) capital. Window figures sliced from one path.
+
+| total | strategy share | final | full | 2024+ | max DD | 1y windows losing | worst 1y | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|---|
+| any | 0% (ETF only) | 2.07x | 13% | 7% | −19% | 35% | −6% | 0% |
+| Rs 20k | 25% | too small (Rs 1k per stock) | | | | | | |
+| Rs 20k | 50% | Rs 82k | 27% | 11% | −27% | 25% | −15% | 15% |
+| Rs 20k | 100% | Rs 1.74 L | 44% | 16% | −36% | 25% | −19% | 85% |
+| Rs 1 L | 25% | Rs 3.24 L | 22% | 10% | −21% | 20% | −8% | 0% |
+| Rs 1 L | 50% | Rs 4.86 L | 31% | 13% | −26% | 20% | −10% | 15% |
+| Rs 1 L | 75% | Rs 6.89 L | 39% | 15% | −29% | 25% | −14% | 70% |
+
+Reading (honest):
+- **Plateau, not a peak, over the full period**: every neighbour beats random and the index
+  (27-50%/yr). But 2021-23 (a strong momentum market) carries it: learn 38-89%, check 2024+ only
+  1-32% (median ~14% vs index 7.7%, random ~0-4%). The edge survived out of sample but is much
+  smaller and very noisy. Plan on roughly index +5%/yr, with long dull stretches.
+- **The market filter is weaker evidence than Results 8 suggested**: 150-day filter = no filter in
+  2024+ (1%); 200 days looks good partly by luck. Keep it (cheap, helps over the full period) but
+  don't count on it.
+- Positions: 4 vs 5 within noise; 3 is clearly worse (−57%). Keep 5.
+- Large caps (top 200) held up best in 2024+ (28%, random 10%) with lower charges (2%/yr) and
+  fewer deep falls; mid/small did worst. Picked after seeing data -> paper-track alongside, don't switch.
+- **Owner's limit (25% fall)**: the strategy alone breaks it in 80% of 1-year windows. Mixes that
+  roughly fit: Rs 1 L with 25% strategy (−21%, never >25%) or 50% (−26%, 15% of years);
+  Rs 20k 50/50 (−27%). Rs 20k with 25% is impossible (positions too small for the charges).
+
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
 `python -m trader collect daily|news|backfill|status` → `data/market.db` (SQLite):
@@ -315,13 +362,16 @@ speed: build catch-up checks, retries and failure alerts into Gate 1.
 
 ## NEXT: Gate 0 backtests (no LLM needed)
 
-Immediate (after Results 8) - robustness of "combo + block-buys filter" without re-tuning:
-- neighbours: exit rank 30/40, filter on 150/250-day average (results should change smoothly);
-- other universes: top 200 by turnover (large caps only) and top 300-500 only (mid/small);
-- core + satellite: e.g. 50% NIFTYBEES + 50% combo, to see the drawdown the owner would live with;
-- Gate 1 plan: paper-trade the chosen rule weekly from the Pi (Telegram), shadow list of top 20.
+Immediate (after Results 9):
+- Owner decides the mix (capital and strategy share) for Gate 1 - see Results 9 table.
+- Gate 1 plan: weekly job on the Pi ranks the point-in-time top 500 (combo + 200d filter, W50, 5
+  slots), sends picks/sells to Telegram, records a paper portfolio + ETF core; also paper-tracks
+  the "top 200 only" variant and a shadow list of the top 20. 3 months, no real money.
+  Needs: Telegram bot (owner creates via BotFather - free), live scoring module, paper ledger.
+- Note: Gate 1 pass criterion "max drawdown < 10%" will often fail on a 3-month window with this
+  strategy even when it works - revisit the criterion with the owner (e.g. judge vs Nifty 500).
 - Results reactions (step 3) once announcements history is long enough (only Nov 2026 so far).
-- Done: turnover/capital/filter/exit comparison (Results 8), split detection fixed (Results 7).
+- Done: robustness (Results 9), turnover/capital/filter/exits (Results 8), split fix (Results 7).
 
 Work on the Pi (studies take minutes; use nohup/tmux). For each signal: rank Nifty 500 stocks
 weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the top decile; compare
