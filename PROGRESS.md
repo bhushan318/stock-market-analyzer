@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 12: crash protection 2006-2026).
+Last updated: 2026-11-27 (Results 13: weekly winners model).
 
 ## Where we are
 
@@ -351,6 +351,27 @@ Reading:
   (17%) with −40% in 2008.
 - 2021-26 numbers flatter the strategy (period used for design); 2006-19 is the cleaner guide:
   index 11%, timed 12%, 75 timed + 25 strategy 14%.
+
+### 13. "Weekly winners" model (2026-11-27, `python -m trader winners`)
+Owner's design: decide Friday close, buy Monday open; +5% target / −5% stop checked from Tuesday
+only (buy-day high never counts; both touched same day -> stop); else sell Friday close. Rs 5k per
+stock, all charges (~0.6-0.7% per round trip incl. slippage). Time split: train 2006-16, tune
+2017-19, TEST 2020-26 (once). 397k stock-weeks, point-in-time top 500. Base rate of "+5% before
+−5%": 26-33%. Models: logistic regression and gradient boosting on 16 price/volume features.
+
+| top 5 each week | train 2006-16 avg trade / CAGR | tune 2017-19 | TEST 2020-26 | target hit (test) | stop hit (test) |
+|---|---|---|---|---|---|
+| gradient boosting | +0.09% / 1% | −0.59% / −29% | −0.46% / −23% | 42% | 41% |
+| logistic regression | −0.76% / −36% | −1.50% / −56% | −0.91% / −40% | 39% | 49% |
+| momentum combo top 5 | −0.40% / −21% | −0.83% / −36% | −0.33% / −18% | 41% | 40% |
+| 5 random stocks | −0.55% / −27% | −0.87% / −38% | −0.59% / −28% | 29% | 28% |
+| Nifty 500 (same weeks) | +0.28% / 13% | +0.22% / 11% | +0.29% / 14% | | |
+
+Reading: the models DO find stocks that hit +5% more often (AUC ~0.61, target hit 42% vs 29%
+random) - but those are simply more volatile stocks (top weights: volatility, distance from the
+200-day average) and hit −5% just as often. Gross edge over random ~+0.1-0.2%/trade is far below
+the ~0.65% round-trip cost of a weekly Rs 5k trade. Every weekly-trading variant loses money after
+charges in every period; the index gains. Weekly 5% swing trading on daily data: rejected.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 

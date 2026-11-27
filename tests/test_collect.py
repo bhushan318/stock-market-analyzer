@@ -172,3 +172,17 @@ def test_hourly_frame_to_rows():
     utc = df.iloc[:1].copy()
     utc.index = pd.DatetimeIndex(["2026-11-26 03:45"])  # naive = UTC -> 09:15 IST
     assert frame_to_rows(utc, "TCS")[0]["ts"] == "2026-11-26T09:15"
+
+
+def test_news_parse_and_entry_day():
+    import pandas as pd
+    from trader.news import event_entry_index, parse_announcements
+    rows = parse_announcements([{"an_dt": "26-Nov-2026 16:02:31", "desc": " Acquisition ", "symbol": "ABC",
+                                 "seq_id": 7, "attchmntText": "buys XYZ"}, {"an_dt": "bad"}])
+    assert rows == [{"seq_id": "7", "symbol": "ABC", "ts": "2026-11-26T16:02:31", "category": "Acquisition",
+                     "text": "buys XYZ"}]
+    cal = pd.DatetimeIndex(["2026-11-25", "2026-11-26", "2026-11-27", "2026-11-30"])
+    assert event_entry_index("2026-11-26T08:30:00", cal) == 1   # before the open: same day's open
+    assert event_entry_index("2026-11-26T11:00:00", cal) == 2   # during market: next session
+    assert event_entry_index("2026-11-27T19:00:00", cal) == 3   # Friday evening: Monday
+    assert event_entry_index("2026-11-28T10:00:00", cal) == 3   # Saturday: Monday

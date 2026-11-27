@@ -202,3 +202,20 @@ def test_timed_core_switches_with_one_day_lag():
     # signals only read on check days
     v, sw = timed_core(idx, above, [True, False, False, False, False, False], cash_rate=0.0, cost=0.0)
     assert sw == 0 and v[-1] == 1.0
+
+
+def test_weekly_winner_label_ignores_buy_day():
+    from trader.winners_study import trade_outcome
+    T = 9
+    O = np.full((T, 4), 100.0); H = O + 1; L = O - 1; C = O.copy()
+    # decided at close 0, bought at open 1. Stock 0: buy-day high +10% must NOT count
+    H[1, 0] = 110
+    # stock 1: Wednesday (session 3) high touches +5% -> target
+    H[3, 1] = 105.5
+    # stock 2: Tuesday low touches -5% and later high +5% -> stop first
+    L[2, 2] = 94; H[4, 2] = 106
+    # stock 3: same day both -> stop counts
+    L[3, 3] = 94; H[3, 3] = 106
+    g, hit = trade_outcome(O, H, L, C, 0, target=0.05, stop=0.05, hold=4, slip=0.0)
+    assert list(hit) == [0, 1, -1, -1]
+    assert np.allclose(g, [1.0, 1.05, 0.95, 0.95])   # stock 0: time exit at the close of session 5

@@ -219,6 +219,16 @@ def cmd_exits(cfg, args):
     run_exits(cfg)
 
 
+def cmd_winners(cfg, args):
+    from .winners_study import run_winners
+    run_winners(cfg)
+
+
+def cmd_news(cfg, args):
+    from .news import main as news_main
+    news_main(cfg, args)
+
+
 def cmd_protect(cfg, args):
     from .protect_study import run_protect
     run_protect(cfg)
@@ -267,6 +277,10 @@ def main():
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
     c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
+    sub.add_parser("winners", help="weekly winners model: +5%% before -5%%, time-series split 2006-16/17-19/20-26")
+    nw = sub.add_parser("news", help="announcements history for a top-N shortlist + price impact (PC)")
+    nw.add_argument("job", choices=["fetch", "impact"])
+    nw.add_argument("--top", type=int, default=50)
     sub.add_parser("protect", help="crash protection 2006-2026: timed index fund, sell-all filter, mixes")
     sub.add_parser("longrun", help="Gate 1 rule on 2006-2019 (data/history.db), out of sample")
     h = sub.add_parser("history", help="old NSE bhavcopies 2005-2019 into data/history.db (PC, research)")
@@ -289,7 +303,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper, "exits": cmd_exits, "history": cmd_history, "longrun": cmd_longrun, "protect": cmd_protect}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper, "exits": cmd_exits, "history": cmd_history, "longrun": cmd_longrun, "protect": cmd_protect, "news": cmd_news, "winners": cmd_winners}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":
