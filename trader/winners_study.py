@@ -26,6 +26,7 @@ from .momentum_pit import pit_signals
 from .momentum_study import weekly_dates
 from .pit import liquid_universe, load_panel
 
+LAST = {}
 TARGET, STOP, HOLD = 0.05, 0.05, 4   # HOLD 4 = Tuesday..Friday: sold before the next Monday's buys
 POS_RS = 5_000
 SPLITS = [("train 2006-16", "2006-07-01", "2016-12-31"), ("tune 2017-19", "2017-01-01", "2019-12-31"),
@@ -84,7 +85,8 @@ def features(p, n5, combo):
     return f, mk
 
 
-def build(cfg):
+def build(cfg, exits=None):
+    """exits: optional {name: (target, stop)} evaluated on the same picks -> net_<name> columns."""
     print("Loading 2005-2026 panel ...", flush=True)
     p = load_panel(db=[ROOT / "data" / "history.db", ROOT / "data" / "market.db"], start="2005-01-01")
     cal = p["cal"]
@@ -107,6 +109,9 @@ def build(cfg):
         g, hit = trade_outcome(O, H, L, C, i)
         cols = np.where(ok & ~np.isnan(g))[0]
         rec = {"date": np.repeat(d, len(cols)), "j": cols, "gross": g[cols], "hit": hit[cols]}
+        for name, (tg, st) in (exits or {}).items():
+            g2, h2 = trade_outcome(O, H, L, C, i, target=tg, stop=st)
+            rec[f"gross_{name}"], rec[f"hit_{name}"] = g2[cols], h2[cols]
         for k, a in F.items():
             rec[k] = a[i, cols]
         for k, s in mk.items():
@@ -115,9 +120,12 @@ def build(cfg):
         rows.append(pd.DataFrame(rec))
     D = pd.concat(rows, ignore_index=True)
     D["net"] = net_return(D["gross"].to_numpy(), cfg["costs"])
+    for name in exits or {}:
+        D[f"net_{name}"] = net_return(D[f"gross_{name}"].to_numpy(), cfg["costs"])
     D["win"] = (D["hit"] == 1).astype(int)
     D["split"] = pd.cut(D["date"], [pd.Timestamp(a) for _, a, _ in SPLITS] + [pd.Timestamp("2100-01-01")],
                         labels=[s for s, _, _ in SPLITS], right=False)
+    LAST["panel"], LAST["n5"] = p, n5  # reused by follow-up studies (avoid a second 1 GB load)
     return D, p["C"].columns
 
 

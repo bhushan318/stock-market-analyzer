@@ -164,4 +164,7 @@ def news_impact(cfg, min_events=15):
 def main(cfg, args):
     if args.job == "fetch":
         return fetch(cfg, top=args.top)
+    if args.job == "baseline":
+        from .news_baseline import run_news_baseline
+        return run_news_baseline(cfg)
     return news_impact(cfg)

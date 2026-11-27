@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 13: weekly winners model).
+Last updated: 2026-11-27 (Results 14: news categories, winners exits, hold-losers on model picks).
 
 ## Where we are
 
@@ -372,6 +372,33 @@ random) - but those are simply more volatile stocks (top weights: volatility, di
 200-day average) and hit −5% just as often. Gross edge over random ~+0.1-0.2%/trade is far below
 the ~0.65% round-trip cost of a weekly Rs 5k trade. Every weekly-trading variant loses money after
 charges in every period; the index gains. Weekly 5% swing trading on daily data: rejected.
+
+### 14. News categories, weekly-winner exits, and "hold losers" on model picks (2026-11-27)
+**News (`news fetch` + `news baseline`):** 26,666 NSE announcements 2019-2026 for a shortlist of
+today's top-50 momentum stocks (data/news.db, PC). Measured from the next tradable open, 20-day
+return vs Nifty 500, compared with the SAME stock's ordinary days (the shortlist beats the index on
+any day: +1.2% 2019-23, +3.2% 2024+ per 20 days - shortlist bias). Only 1 of 41 NSE categories
+holds in both periods with |t| > 2: "Disclosure under SEBI Takeover Regulations" (+2.3% / +1.8%;
+buy and sell disclosures mixed). Results announcements: no consistent effect. -> NSE category
+labels alone add little; the text (results beat/miss, promoter buy/sell) would need an LLM and can
+only be tested going forward (hindsight leak) - announcements collected on the Pi since 2026-11.
+
+**Weekly winners, other exits (`winners-exits`):** same model picks, buy Monday open, sold by
+Friday close: +5%/−5%, +5%/−10%, +5%/no stop, no target/no stop - all lose 0.4-1.0% per trade
+after charges in every period (index +0.2-0.3%/week). The −5% stop had been added by me, not the
+owner; removing it does not change the conclusion for a one-week hold.
+
+**Owner's rule on model picks (`winners-hold`):** sell only when the day's high reaches +5% (or
++10%) after charges, never at a loss, no time limit, 5 slots (Rs 25k):
+
+| period | model +5% | momentum +5% | random +5% | model +10% | random +10% | Nifty 500 |
+|---|---|---|---|---|---|---|
+| train 2006-16 | 3% (DD −54%) | 5% (−66%) | 3% (−59%) | 3% (−47%) | 10% (−56%) | 10% |
+| tune 2017-19 | −11% (−53%) | −2% (−40%) | −8% (−40%) | −14% (−57%) | 1% (−42%) | 12% |
+| TEST 2020-26 | 2% (−48%) | 5% (−51%) | 8% (−46%) | 10% (−54%) | 9% (−29%) | 14% |
+Every variant: ~100% of sold trades are winners, 25-55% of the money stuck in losers, all 5 slots
+under water at the end of every period. Model picks are no better than random under this rule.
+Never-sell-at-loss rejected for the 5th time (20 years, model picks, intraday targets, time split).
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
