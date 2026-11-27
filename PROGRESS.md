@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 9: robustness + core/satellite).
+Last updated: 2026-11-27 (Gate 1 paper trading started on the Pi).
 
 ## Where we are
 
@@ -15,7 +15,11 @@ Results 9 (robustness, 2026-11-27): every neighbour of "W50 + filter" still beat
 Nifty 500 over 2021-26, but 2024+ returns scatter from 1% to 32%/yr and the filter's benefit is
 fragile (150-day filter = no filter in 2024+). Realistic expectation ~ index + 5%/yr, not 44%.
 Alone, the strategy fell >25% in 80% of 1-year windows; the owner's limit is 25% -> run it as a
-satellite next to a Nifty 500 ETF core. Next: owner picks the mix, then Gate 1 paper trading.**
+satellite next to a Nifty 500 ETF core.
+2026-11-27: owner chose 75% Nifty 500 index fund / 25% strategy on Rs 1 lakh. **Gate 1 paper
+trading started on the Pi** (`trader/paper.py`, timer 20:30 IST; books valued from the 26-Nov
+close; first decision on Friday 27-Nov close, fills Monday's open). Waiting for the owner's
+Telegram bot token + chat id in the Pi's .env (until then reports go to the journal only).**
 
 ## The plan (agreed with the owner)
 
@@ -25,7 +29,7 @@ max 5 positions, real money only after passing gates:
 | Gate | What | Money | Pass criteria |
 |---|---|---|---|
 | 0 Backtest | Everything testable on history: momentum/relative strength, delivery %, results reactions, lever sensitivities | ₹0 | Beats random picks **and** Nifty 500 buy-and-hold on rolling windows |
-| 1 Paper (3 months) | Full system live: 5 positions + shadow list of top 20-30 scored stocks | ₹0 | Beats Nifty 500 ETF after charges+tax; max drawdown < 10% |
+| 1 Paper (3 months) | Full system live: 5 positions + shadow list of top 20-30 scored stocks | ₹0 | 75/25 mix beats Nifty 500 after charges (and tax noted); never falls more than 25% (changed 2026-11-27 from "< 10%", which this strategy fails often even when working) |
 | 2 Small live (2-3 months) | Real Zerodha orders | ₹20k | Live ≈ paper within ~1%; no operational errors |
 | 3 Scale | 25% → 50% → 100% of target capital, ~1 month each | partial | Risk limits held |
 
@@ -40,6 +44,11 @@ reviews) + measured lever sensitivities → (3) news archive tagged by LLM → (
 (5) paper portfolio + shadow list.
 
 ## Open decisions
+
+- **Gate 1 setup (decided 2026-11-27):** combo momentum, weekly, exit out of top 50, no buys or
+  sells while Nifty 500 < 200-day average, 5 stocks; 25% of Rs 1 lakh in the strategy, 75% in a
+  Nifty 500 index fund, reset each January. Paper books: "main" (top 500) and "large" (top 200,
+  for comparison). Expectation: a few %/yr over the index, falls up to ~20-25%, some years behind.
 
 - **Exit rule:** owner leans "never sell at a loss" and believes good selection keeps stuck cases
   rare. Agreed to test it: paper-track both (a) never-sell-at-loss and (b) target + thesis-break +
@@ -362,14 +371,14 @@ speed: build catch-up checks, retries and failure alerts into Gate 1.
 
 ## NEXT: Gate 0 backtests (no LLM needed)
 
-Immediate (after Results 9):
-- Owner decides the mix (capital and strategy share) for Gate 1 - see Results 9 table.
-- Gate 1 plan: weekly job on the Pi ranks the point-in-time top 500 (combo + 200d filter, W50, 5
-  slots), sends picks/sells to Telegram, records a paper portfolio + ETF core; also paper-tracks
-  the "top 200 only" variant and a shadow list of the top 20. 3 months, no real money.
-  Needs: Telegram bot (owner creates via BotFather - free), live scoring module, paper ledger.
-- Note: Gate 1 pass criterion "max drawdown < 10%" will often fail on a 3-month window with this
-  strategy even when it works - revisit the criterion with the owner (e.g. judge vs Nifty 500).
+Immediate (Gate 1 running, started 2026-11-27):
+- Owner: create the Telegram bot (BotFather), put TELEGRAM_BOT_TOKEN in the Pi's .env, message
+  the bot, run `python -m trader paper chatid`, add TELEGRAM_CHAT_ID. Then `paper status` to check.
+- Check Monday 2026-11-30 evening: first fills recorded correctly (`paper status`, journal).
+- Gate 1 commands on the Pi: `python -m trader paper init|run|status|chatid`; state in data/paper.db;
+  logs `journalctl --user -u trader-paper`. Real index fund for the 75% core to be chosen before
+  Gate 2 (a Nifty 500 index fund/ETF; paper uses the index minus 0.2%/yr).
+- Review after 3 months (~end Feb 2027): main vs large vs Nifty 500, worst fall, charges, slippage.
 - Results reactions (step 3) once announcements history is long enough (only Nov 2026 so far).
 - Done: robustness (Results 9), turnover/capital/filter/exits (Results 8), split fix (Results 7).
 

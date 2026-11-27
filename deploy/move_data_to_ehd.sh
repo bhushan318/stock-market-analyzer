@@ -35,9 +35,9 @@ elif ! grep -Es "[[:space:]]$EHD[[:space:]]" /etc/fstab | grep -q nofail; then
 fi
 df -h "$EHD" | tail -1
 
-step "Stop collectors while data moves"
-systemctl --user stop trader-collect-daily.timer trader-collect-news.timer \
-  trader-collect-daily.service trader-collect-news.service 2>/dev/null || true
+step "Stop collectors + paper trading while data moves"
+systemctl --user stop trader-collect-daily.timer trader-collect-news.timer trader-paper.timer \
+  trader-collect-daily.service trader-collect-news.service trader-paper.service 2>/dev/null || true
 
 step "ext4 image $IMG (${SIZE_GB} GB)"
 if [ ! -f "$IMG" ]; then
@@ -102,7 +102,7 @@ step "Database check"
 .venv/bin/python -m trader collect status
 
 step "Restart collectors"
-systemctl --user start trader-collect-daily.timer trader-collect-news.timer
+systemctl --user start trader-collect-daily.timer trader-collect-news.timer trader-paper.timer
 systemctl --user list-timers 'trader-*' --no-pager
 
 if [ "$BACKFILL" = 1 ]; then
