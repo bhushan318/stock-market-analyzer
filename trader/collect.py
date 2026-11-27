@@ -122,9 +122,6 @@ def run_daily(cfg, day=None):
                 report[d.isoformat()] = n
     collect_deals(con, client, report)
     collect_fii_dii(con, client, report)
-    from .extra import SCHEMA as EXTRA_SCHEMA, collect_news_feeds
-    con.executescript(EXTRA_SCHEMA)
-    report["business_news"] = collect_news_feeds(con)
     return report
 
 
