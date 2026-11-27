@@ -3,6 +3,7 @@
     python -m trader collect daily              # bhavcopy (+ catch-up), deals, FII/DII
     python -m trader collect news               # announcements + results RSS (+ deals, FII/DII)
     python -m trader collect backfill --start 2020-01-01
+    python -m trader collect extra              # F&O summary, results/shareholding filings, levers (extra.py)
     python -m trader collect hourly             # Yahoo 1-hour bars, today's Nifty 500 (see hourly.py)
     python -m trader collect status
 """
@@ -121,6 +122,9 @@ def run_daily(cfg, day=None):
                 report[d.isoformat()] = n
     collect_deals(con, client, report)
     collect_fii_dii(con, client, report)
+    from .extra import SCHEMA as EXTRA_SCHEMA, collect_news_feeds
+    con.executescript(EXTRA_SCHEMA)
+    report["business_news"] = collect_news_feeds(con)
     return report
 
 
@@ -244,6 +248,9 @@ def main(cfg, args):
     elif args.job == "backfill":
         run_backfill(cfg, date.fromisoformat(args.start),
                      date.fromisoformat(args.end) if args.end else None, weekends=args.weekends)
+    elif args.job == "extra":
+        from .extra import run_extra
+        print(run_extra(connect(db_path(cfg))))
     elif args.job == "hourly":
         from .hourly import collect_hourly
         print(collect_hourly(connect(db_path(cfg))))

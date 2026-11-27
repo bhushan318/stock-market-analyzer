@@ -1,0 +1,11 @@
+[Unit]
+Description=Selection data: weekdays 20:10 IST (after the 19:30 bhavcopy run), Saturday 10:30 catch-up
+
+[Timer]
+OnCalendar=Mon..Fri 20:10 Asia/Kolkata
+OnCalendar=Sat 10:30 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=3min
+
+[Install]
+WantedBy=timers.target

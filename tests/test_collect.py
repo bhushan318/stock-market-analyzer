@@ -210,3 +210,15 @@ def test_fno_parsers_and_aggregate():
     b = aggregate(parse_contracts(new))[0]
     assert (b["date"], b["symbol"], b["ce_oi"], b["ce_contracts"], b["fut_oi_chg"], b["fut_contracts"], b["fut_close"]) == \
         ("2026-11-26", "ABCAPITAL", 52700.0, 2.0, -1550.0, 10.0, 414.0)
+
+
+def test_extra_news_and_filings_parsers():
+    from trader.extra import filing_rows, parse_news_rss
+    xml = ("<rss><channel><item><title>Crude falls 3%</title><link>https://x/1</link>"
+           "<pubDate>Fri, 27 Nov 2026 10:00:00 +0530</pubDate><description>OMCs gain</description></item>"
+           "<item><title>no link</title></item></channel></rss>")
+    rows = parse_news_rss(xml, "et_markets", "now")
+    assert len(rows) == 1 and rows[0]["title"] == "Crude falls 3%" and rows[0]["source"] == "et_markets"
+    f = filing_rows("results", [{"symbol": "TCS", "broadCastDate": "09-Jan-2026", "x": 1},
+                                {"symbol": "TCS", "broadCastDate": "09-Jan-2026", "x": 2}], "symbol", "broadCastDate")
+    assert len({r["key"] for r in f}) == 2 and f[0]["symbol"] == "TCS"

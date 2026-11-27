@@ -297,7 +297,7 @@ def main():
     sub.add_parser("delivery", help="Gate 0 step 2: delivery %% signals (point-in-time universe)")
     sub.add_parser("momentum-pit", help="Gate 0 step 1 without survivorship bias (NSE bhavcopy universe)")
     c = sub.add_parser("collect", help="NSE data collectors (daily / news / backfill / status / export)")
-    c.add_argument("job", choices=["daily", "news", "backfill", "hourly", "status", "export"])
+    c.add_argument("job", choices=["daily", "news", "backfill", "hourly", "extra", "status", "export"])
     c.add_argument("--date", help="daily: collect as of this date (YYYY-MM-DD)")
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")

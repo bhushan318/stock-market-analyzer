@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 mkdir -p ~/.config/systemd/user
 cp deploy/*.service deploy/*.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now trader-collect-daily.timer trader-collect-news.timer trader-paper.timer trader-collect-hourly.timer
+systemctl --user enable --now trader-collect-daily.timer trader-collect-news.timer trader-paper.timer trader-collect-hourly.timer trader-collect-extra.timer
 # keep user timers running when you are not logged in
 sudo loginctl enable-linger "$USER"
 
