@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 16: overnight S&P 500; F&O history download started).
+Last updated: 2026-11-27 (forward-only approach; selection data collected daily on the Pi).
 
 ## Where we are
 
@@ -412,6 +412,24 @@ Owner's idea: fill slots one at a time, only the strongest picks. Gate 1 rule, 2
 Reading: staggering does not help; being in the top ~5 of the ranking is what matters (random
 picks among the top 3-5 also do well), the exact order inside the top few does not. -> effort
 belongs in better SELECTION, which the owner also concluded.
+
+## DECISION 2026-11-27 (later): forward-only, judged on paper trading
+Owner: stop using old data; collect what is available from today, refine the selection algorithm
+on paper until it is statistically better. Target: **18%/yr after tax** (~22-23%/yr before 20%
+STCG, after charges). Pass rule agreed in principle: beats Nifty 500 AND random picks after tax
+over >= ~150 paper trades (realistically 12-18 months; 2-3 months can be luck). Every change to a
+rule restarts its count. The F&O history download was stopped (fno.db partial, unused).
+Forward data on the Pi (market.db), from 2026-11-27:
+  - existing: bhavcopy + delivery, deals, FII/DII, NSE announcements RSS, hourly bars (Yahoo)
+  - `collect extra` (timer weekdays 20:10, Sat 10:30): fno_daily (futures/options OI + volume per
+    underlying, ~224/day), filings (latest quarterly results 3,816 + shareholding 2,378, raw JSON),
+    levers (S&P 500, Brent, USD/INR, gold, US 10y, India VIX, Nifty, Nifty 500)
+  - hourly news job now also stores business news RSS: ET Markets, Moneycontrol, Livemint, PIB
+  - NOT available: NSE insider-trading (PIT) API empty after early May 2026 (use announcements)
+Paper trading: first decision Friday 2026-11-27 (5 buys pending per book for Monday's open).
+Next: define selection ideas on the forward data as separate paper books (options OI build-up /
+put-call, SAST/insider announcements, results surprise from filings, lever tailwind, news tags
+once Gemini key exists), weekly Telegram comparison vs index, random and the momentum baseline.
 
 ## RESEARCH PLAN (agreed 2026-11-27): 2-3 months on stock selection, nothing else
 Owner's style: event/lever-driven trades of weeks; selection = trigger + confirmation + filters.
