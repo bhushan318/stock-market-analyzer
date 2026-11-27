@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Gate 1 paper trading started on the Pi).
+Last updated: 2026-11-27 (Results 10: exits with intraday high/low; Gate 1 running).
 
 ## Where we are
 
@@ -254,6 +254,37 @@ Reading (honest):
 - **Owner's limit (25% fall)**: the strategy alone breaks it in 80% of 1-year windows. Mixes that
   roughly fit: Rs 1 L with 25% strategy (−21%, never >25%) or 50% (−26%, 15% of years);
   Rs 20k 50/50 (−27%). Rs 20k with 25% is impossible (positions too small for the charges).
+
+### 10. Exits as standing orders on the day's high/low (2026-11-27, `python -m trader exits`)
+Owner's point: a real target/stop order (Zerodha GTT) fills when the price touches it during the
+day, so Results 8 (close-checked) was unfair to targets. The bhavcopy has every day's high and low
+(all 3.2M EQ rows 2020-26 valid), so `simulate(intraday=(H, L))` now fills targets at the target
+(or a higher open) and stops at the stop (or a lower open, minus slippage) from the day after the
+buy; both touched the same day -> stop assumed first (intraday order unknowable from daily data).
+Entry = Gate 1 rule (combo weekly, 200d filter, 5 stocks, Rs 20k); only the exit differs.
+Nifty 500: 13% full, 7.7% check.
+
+| exit | Rs 20k -> | full | random | check 24+ | max DD | win rate | money stuck >60d underwater | 3y beat N500 |
+|---|---|---|---|---|---|---|---|---|
+| **rank exit (top 50) - Gate 1 rule** | **1.74 L** | **44%** | 19% | 11% | −36% | 47% | 4% | 100% |
+| rank + stop, intraday | 1.65 L | 43% | 17% | 8% | −37% | 47% | 3% | 100% |
+| rank + target 15%, intraday | 0.89 L | 29% | 4% | −8% | −32% | 59% | 6% | 75% |
+| rank + target 25%, intraday | 0.75 L | 25% | 6% | 20% | −38% | 48% | 5% | 92% |
+| target 10% + stop, close / intraday | 0.40 / 0.25 L | 13 / 4% | | 5 / −10% | −41 / −50% | 74% | 23 / 14% | 58 / 8% |
+| target 15% + stop, close / intraday | 0.43 / 0.46 L | 14 / 15% | | 7 / 2% | −44 / −36% | 67-71% | 15-18% | 83 / 75% |
+| target 20% + stop, intraday | 0.72 L | 24% | 5% | 16% | −28% | 70% | 16% | 83% |
+| never-sell-at-loss + target 5%, intraday | 0.18 L | −2% | 8% | −4% | −53% | 100% | 45% | 0% |
+| never-sell-at-loss + target 10%, intraday | 0.13 L | −7% | 9% | −3% | −61% | 100% | 51% | 0% |
+| never-sell-at-loss + rank + target 10%, intraday | 0.20 L | 0% | 9% | −2% | −50% | 100% | 51% | 17% |
+
+Reading:
+- Intraday fills make targets fire more often, but also stops (lows touch them more often than
+  closes) - net, targets+stops do not improve; capping winners is what hurts: momentum profit
+  comes from a few big winners (top 10 trades > 100% of profit with the rank exit).
+- Never-sell-at-loss: every closed trade is a winner (100% win rate) but half the money sits in
+  losers that never come back; all 5 slots end underwater; worse than random and the index.
+  Rejected for the 4th time, now with the fairer intraday targets.
+- Keep the Gate 1 rule (rank exit, no target). A volatility stop is neutral (−1%/yr, same DD).
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 

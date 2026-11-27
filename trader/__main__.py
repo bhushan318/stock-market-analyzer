@@ -214,6 +214,11 @@ def cmd_levers(cfg, args):
     run_levers(cfg)
 
 
+def cmd_exits(cfg, args):
+    from .exits_study import run_exits
+    run_exits(cfg)
+
+
 def cmd_paper(cfg, args):
     from .paper import main as paper_main
     paper_main(cfg, args)
@@ -237,6 +242,7 @@ def main():
     sub.add_parser("momentum", help="Gate 0 step 1: momentum / relative strength study")
     sub.add_parser("levers", help="Gate 0 step 4: lever sensitivities (crude, USD/INR, gold, rates)")
     sub.add_parser("combo", help="Gate 0: combo momentum - turnover, capital, market filter, exits")
+    sub.add_parser("exits", help="Gate 0: target/stop as standing orders on daily high/low vs close-checked")
     sub.add_parser("robust", help="Gate 0: robustness of combo + market filter, core+satellite mixes")
     sub.add_parser("delivery", help="Gate 0 step 2: delivery %% signals (point-in-time universe)")
     sub.add_parser("momentum-pit", help="Gate 0 step 1 without survivorship bias (NSE bhavcopy universe)")
@@ -262,7 +268,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper, "exits": cmd_exits}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

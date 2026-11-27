@@ -154,3 +154,37 @@ def test_mix_equity_rebalances_to_weight():
     # after a rebalance the next move applies to the reset weights
     e = mix_equity([1, 2, 4], [1, 1, 1], 0.5, rebal_at=[1], fee=0.0)
     assert np.isclose(e[2], 1.5 + 0.75)
+
+
+def test_intraday_target_and_stop_use_high_low():
+    costs = load_config()["costs"]
+    T = 10
+    order = {0: np.array([0, 1])}
+    O = _flat(T, [100, 100])
+    kw = dict(n=1, exit_rank=10**9)
+    # high touches +25% on day 4 but closes flat: intraday target sells that day at the target price
+    H, L = O.copy(), O.copy()
+    H[4, 0] = 125
+    H[1, 0] = 200  # buy day (day 1): CNC shares cannot be sold the same day
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, target=0.2, intraday=(H, L), **kw)
+    assert len(r["trades"]) == 1 and r["trades"][0][4] == 4 and abs(r["trades"][0][1] - 0.2) < 1e-6
+    # checked at the close only, the same day never triggers
+    assert len(simulate(O, O.copy(), order, 0, T, 20000, costs, target=0.2, **kw)["trades"]) == 0
+    # gap above the target: filled at the (better) open
+    O2 = O.copy(); O2[4:, 0] = 130
+    H2 = np.maximum(H, O2)
+    r = simulate(O2, O2.copy(), order, 0, T, 20000, costs, target=0.2, intraday=(H2, L), **kw)
+    assert r["trades"][0][1] > 0.25
+    # stop at 100 x (1 - 2 x 0.02 x sqrt(20)) = 82.1; low 80 triggers, filled at the stop - slippage
+    vol = np.full(O.shape, 0.02)
+    L3 = L.copy(); L3[4, 0] = 80
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, stop_k=2.0, vol=vol, intraday=(H, L3), **kw)
+    assert r["trades"][0][4] == 4 and -0.19 < r["trades"][0][1] < -0.17
+    # gap down through the stop: filled at the open (70), worse than the stop
+    O4 = O.copy(); O4[4:, 0] = 70
+    L4 = np.minimum(L, O4)
+    r = simulate(O4, O4.copy(), order, 0, T, 20000, costs, stop_k=2.0, vol=vol, intraday=(H, L4), **kw)
+    assert r["trades"][0][1] < -0.29
+    # both touched on one day: the stop is assumed to come first
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, target=0.2, stop_k=2.0, vol=vol, intraday=(H, L3), **kw)
+    assert len(r["trades"]) == 1 and r["trades"][0][1] < 0

@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from . import ROOT
-from .costs import buy_charges, sell_charges
+from .costs import buy_charges, sell_charges, sell_rate
 from .data import download_prices, wide
 
 START = "2016-01-01"
@@ -101,7 +101,7 @@ def signal_test(sig, O, C, rebal):
 
 def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss=False,
              rng=None, hold_dist=None, stuck_days=60, min_val=1500,
-             regime=None, regime_exit=False, target=None, stop_k=None, vol=None):
+             regime=None, regime_exit=False, target=None, stop_k=None, vol=None, intraday=None):
     """Weekly rotation. O, C: numpy (T x N); C forward-filled for marking.
 
     Optional rules (all off by default; applied the same way in random mode):
@@ -110,6 +110,11 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
       target      sell when the position is up this much after all charges (checked every close).
       stop_k, vol sell when the close falls below buy price x (1 - stop_k * vol * sqrt(20)), with
                   vol = T x N daily-return std known on the decision day (checked every close).
+      intraday    (H, L) numpy arrays: target/stop become standing orders (Zerodha GTT-like)
+                  checked against each day's high/low from the day after the buy (CNC). Target fills
+                  at the target price (or the open if it gaps above), stop at the stop price or the
+                  gap-down open minus slippage; if both are touched the same day, the stop counts.
+                  Without it, target/stop are checked at the close and sold at the next open.
 
     order: {day index -> np.array of column indices, best first (eligible only)} on rebalance days.
     Random mode (rng + hold_dist given): picks are random eligible stocks, each held for a period
@@ -121,7 +126,8 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
     cash = float(capital)
     pos = {}  # j -> [shares, cost_basis, buy_i, hold_days]
     sells, buys = set(), []
-    stop_px = {}
+    stop_px, tgt_px = {}, {}
+    rate = sell_rate(costs)
     eq, stuck, trades = [], [], []
     charges = 0.0
     prev_equity = cash
@@ -162,7 +168,32 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
                 if stop_k is not None:
                     v0 = vol[i - 1, j]
                     stop_px[j] = px * (1 - stop_k * (v0 if v0 == v0 else 0.03) * math.sqrt(20))
+                if target is not None:  # gross price whose net (after all sell charges) = basis x (1+target)
+                    tgt_px[j] = ((sh * px + ch) * (1 + target) + costs["dp_charge_per_sell"]
+                                 + costs["brokerage"]) / (1 - rate) / sh
             buys = []
+        if intraday is not None and (target is not None or stop_k is not None):
+            Hh, Ll = intraday
+            for j in list(pos):
+                sh, basis, bi, _ = pos[j]
+                h, lo, o = Hh[i, j], Ll[i, j], O[i, j]
+                if bi >= i or h != h or lo != lo:
+                    continue
+                fill = None
+                sp, tp = stop_px.get(j), tgt_px.get(j)
+                if stop_k is not None and sp is not None and lo <= sp:
+                    fill = (o if o == o and o < sp else sp) * (1 - slip)
+                elif target is not None and tp is not None and h >= tp:
+                    fill = o if o == o and o > tp else tp
+                if fill is None:
+                    continue
+                pos.pop(j)
+                sells.discard(j)
+                v = sh * fill
+                ch = sell_charges(v, costs)
+                cash += v - ch
+                charges += ch
+                trades.append((i - bi, (v - ch) / basis - 1, j, bi, i, v - ch - basis))
         held, stk = 0.0, 0.0
         for j, (sh, basis, bi, _) in pos.items():
             v = sh * C[i, j]
@@ -173,7 +204,7 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
         prev_equity = equity
         eq.append(equity)
         stuck.append(stk / equity)
-        if (target is not None or stop_k is not None) and i + 1 < i1:
+        if intraday is None and (target is not None or stop_k is not None) and i + 1 < i1:
             for j, (sh, basis, bi, _) in pos.items():
                 if j in sells:
                     continue
