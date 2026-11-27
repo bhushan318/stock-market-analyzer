@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 15: staggered entry; research plan for stock selection).
+Last updated: 2026-11-27 (Results 16: overnight S&P 500; F&O history download started).
 
 ## Where we are
 
@@ -426,6 +426,22 @@ news DB, 2015+) to evaluate; forward news/PIB headlines on the Pi with Gemini ta
   Weeks 3-6: test each signal alone (vs same stock's ordinary days, learn old / check new).
   Weeks 7-9: combine survivors into one selection score (time-split model) vs momentum/random.
   Weeks 10-12: Pi computes the score weekly and paper-trades it next to the current books.
+
+### 16. Last night's S&P 500 vs the Indian day (2026-11-27, `python -m trader overnight`)
+5,165 NSE days 2006-2026, average point-in-time top-200 stock, by the previous US session's move:
+| S&P 500 last night | days | opening gap | open -> close | open -> 1 week |
+|---|---|---|---|---|
+| below −2% | 215 | −1.22% | +0.28% | −0.11% |
+| −2 to −1% | 417 | −0.31% | −0.15% | −0.30% |
+| flat | 1750 | +0.23% | −0.12% | +0.19% |
+| +1 to +2% | 545 | +0.67% | −0.24% | +0.16% |
+| above +2% | 163 | +1.26% | −0.43% | −0.20% |
+Same pattern in 2006-15 and 2016-26. Reading: the US move sets the OPENING GAP (already in the
+price before anyone can buy at 09:15); after the open there is a small reversal (big US fall ->
++0.3% recovery; big US rise -> −0.4% fade), smaller than one trade's ~0.65% cost; no weekly edge.
+Use only as an entry nudge: avoid chasing a big gap-up open, gap-down opens after a US sell-off
+are slightly better entries. Also: open -> close is negative on average (−0.1 to −0.2%) - buying
+later in the day than the open may be marginally cheaper (to test with the simulator).
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
