@@ -111,13 +111,16 @@ def etf_symbols():
 
 
 def load_panel(db=None, start="2020-01-01"):
-    """Wide, split-adjusted frames {O, H, L, C, V, TO(Rs cr), DELIV(%)} + events + delisted info."""
-    db = db or ROOT / "data" / "market.db"
-    con = sqlite3.connect(db)
-    df = pd.read_sql(
-        "SELECT date, symbol, series, prev_close, open, high, low, close, volume, turnover_lacs, deliv_pct "
-        "FROM eq_daily WHERE date >= ?", con, params=(start,), parse_dates=["date"])
-    con.close()
+    """db: path or list of paths. Wide, split-adjusted frames {O, H, L, C, V, TO(Rs cr), DELIV(%)} + events + delisted info."""
+    dbs = db if isinstance(db, (list, tuple)) else [db or ROOT / "data" / "market.db"]
+    parts = []
+    for d in dbs:  # several DBs (history.db 2005-19 + market.db 2020+) form one continuous panel
+        con = sqlite3.connect(d)
+        parts.append(pd.read_sql(
+            "SELECT date, symbol, series, prev_close, open, high, low, close, volume, turnover_lacs, deliv_pct "
+            "FROM eq_daily WHERE date >= ?", con, params=(start,), parse_dates=["date"]))
+        con.close()
+    df = pd.concat(parts, ignore_index=True)
     df = df[~df["symbol"].isin(etf_symbols())]
     # rights entitlements (XYZ-RE, XYZ-RE1) trade for a few days in BE; they are not shares
     df = df[~df["symbol"].str.contains(r"-RE\d*$", regex=True)]

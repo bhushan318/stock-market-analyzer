@@ -188,3 +188,17 @@ def test_intraday_target_and_stop_use_high_low():
     # both touched on one day: the stop is assumed to come first
     r = simulate(O, O.copy(), order, 0, T, 20000, costs, target=0.2, stop_k=2.0, vol=vol, intraday=(H, L3), **kw)
     assert len(r["trades"]) == 1 and r["trades"][0][1] < 0
+
+
+def test_timed_core_switches_with_one_day_lag():
+    from trader.protect_study import timed_core
+    idx = [100, 100, 50, 50, 50, 100]
+    above = [True, False, False, False, True, True]
+    check = [True] * 6
+    v, sw = timed_core(idx, above, check, cash_rate=0.0, cost=0.0)
+    # signal False at close 1 -> still in on day 2 (falls to 50), out from close 2;
+    # signal True at close 4 -> back in at close 5, so day 5's jump is missed
+    assert list(v) == [1.0, 1.0, 0.5, 0.5, 0.5, 0.5] and sw == 2
+    # signals only read on check days
+    v, sw = timed_core(idx, above, [True, False, False, False, False, False], cash_rate=0.0, cost=0.0)
+    assert sw == 0 and v[-1] == 1.0

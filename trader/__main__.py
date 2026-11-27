@@ -219,6 +219,11 @@ def cmd_exits(cfg, args):
     run_exits(cfg)
 
 
+def cmd_protect(cfg, args):
+    from .protect_study import run_protect
+    run_protect(cfg)
+
+
 def cmd_longrun(cfg, args):
     from .longrun_study import run_longrun
     run_longrun(cfg)
@@ -262,6 +267,7 @@ def main():
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
     c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
+    sub.add_parser("protect", help="crash protection 2006-2026: timed index fund, sell-all filter, mixes")
     sub.add_parser("longrun", help="Gate 1 rule on 2006-2019 (data/history.db), out of sample")
     h = sub.add_parser("history", help="old NSE bhavcopies 2005-2019 into data/history.db (PC, research)")
     h.add_argument("job", choices=["fetch", "status"])
@@ -283,7 +289,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper, "exits": cmd_exits, "history": cmd_history, "longrun": cmd_longrun}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper, "exits": cmd_exits, "history": cmd_history, "longrun": cmd_longrun, "protect": cmd_protect}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

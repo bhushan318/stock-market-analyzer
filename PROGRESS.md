@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 11: out-of-sample 2006-2019; data on external disk; hourly bars).
+Last updated: 2026-11-27 (Results 12: crash protection 2006-2026).
 
 ## Where we are
 
@@ -320,6 +320,37 @@ Reading (honest):
 - Next to test (owner to decide): protect the WHOLE portfolio in crashes - e.g. hold the index
   fund only while Nifty 500 > 200-day average (else a liquid/debt fund), and/or sell the
   strategy stocks when the filter turns off (whipsaw cost in 2021-26, Results 8, vs crash saving).
+
+### 12. Crash protection for the whole portfolio, 2006-2026 (2026-11-27, `python -m trader protect`)
+history.db + market.db as one panel (5,414 sessions, 3,174 split/bonus events). Rs 1 lakh, Jul 2006
+-> Nov 2026, before tax. "Timed" index fund = hold Nifty 500 only while it is above its 200-day
+average (checked Fridays, switch Monday close, 0.1%/switch), else a liquid fund at 6%/yr.
+"Sell all" = strategy sells every stock when the filter turns off (vs "block" = only stop buying).
+
+| portfolio | Rs 1 L -> | per yr | 2006-19 | 2021-26 | worst fall | worst 1y | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|
+| index fund, always | 9.3 L | 12% | 11% | 13% | −64% | −57% | 18% |
+| **index fund, timed** | 9.2 L | 12% | 12% | 8% | **−29%** | −24% | 5% |
+| strategy alone (block) | 165 L | 29% | 15% | 49% | −78% | −72% | 65% |
+| strategy alone (sell all) | 58 L | 22% | 16% | 24% | −50% | −39% | 44% |
+| 75 always + 25 block (Gate 1 now) | 25.3 L | 17% | 12% | 24% | −68% | −61% | 18% |
+| 75 timed + 25 block | 26.5 L | 17% | 14% | 19% | −40% | −36% | 5% |
+| **75 timed + 25 sell all** | 17.4 L | 15% | 14% | 13% | **−29%** | −25% | 5% |
+
+Worst fall inside each market fall (index / timed index / 75-25 now / 75 timed + 25 sell-all):
+2008 −64/−28/−68/−29; 2010-11 −32/−13/−27/−19; 2018 −16/−11/−21/−18; Covid 2020 −38/−9/−36/−8;
+2024-25 −19/−13/−20/−12.
+
+Reading:
+- The 200-day rule on the index fund kept the same 20-year return (12%) with less than half the
+  worst fall (−29% vs −64%). Cost: whipsaws (~3 switches/yr, more small losing years: 8 vs 4) and
+  lagging in strong bull runs (2021-26: 8% vs 13%). Each switch out is a taxable sale (not
+  modelled; roughly −0.5 to −1%/yr) and the 6% liquid-fund rate is an assumption.
+- "75 timed + 25 sell all" is the only mix near the owner's 25% limit in every crash (worst −29%,
+  2008) at ~+3%/yr over the index (15 vs 12). The more aggressive "75 timed + 25 block" earns more
+  (17%) with −40% in 2008.
+- 2021-26 numbers flatter the strategy (period used for design); 2006-19 is the cleaner guide:
+  index 11%, timed 12%, 75 timed + 25 strategy 14%.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
