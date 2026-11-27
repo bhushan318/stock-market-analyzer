@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 14: news categories, winners exits, hold-losers on model picks).
+Last updated: 2026-11-27 (Results 15: staggered entry; research plan for stock selection).
 
 ## Where we are
 
@@ -399,6 +399,33 @@ owner; removing it does not change the conclusion for a one-week hold.
 Every variant: ~100% of sold trades are winners, 25-55% of the money stuck in losers, all 5 slots
 under water at the end of every period. Model picks are no better than random under this rule.
 Never-sell-at-loss rejected for the 5th time (20 years, model picks, intraday targets, time split).
+
+### 15. Staggered entry (2026-11-27, `python -m trader stagger`)
+Owner's idea: fill slots one at a time, only the strongest picks. Gate 1 rule, 2006-2026, Rs 25k.
+| variant | per yr full | random (same limits) | 2006-19 | 2020-26 | worst fall | avg cash |
+|---|---|---|---|---|---|---|
+| fill all 5 (Gate 1 rule) | 29% | 6% | 15% | 59% | −78% | 2% |
+| 1 new stock per week | 27% | 4% | 15% | 44% | −70% | 6% |
+| 2 new per week | 28% | 10% | 15% | 54% | −78% | 2% |
+| 1 per week, top 3 only | 27% | 19% | 15% | 43% | −68% | 7% |
+| 1 per week, only the #1 | 22% | 21% | 14% | 29% | −57% | 18% |
+Reading: staggering does not help; being in the top ~5 of the ranking is what matters (random
+picks among the top 3-5 also do well), the exact order inside the top few does not. -> effort
+belongs in better SELECTION, which the owner also concluded.
+
+## RESEARCH PLAN (agreed 2026-11-27): 2-3 months on stock selection, nothing else
+Owner's style: event/lever-driven trades of weeks; selection = trigger + confirmation + filters.
+Owner's trigger ideas: news/events, levers (crude, INR, rates), options activity (volumes, put/call,
+OI build-up), major sector news, taxes/policy, scams. Exits/holding come after selection is solid.
+Data availability checked 2026-11-27 (NSE, free): F&O bhavcopy (options+futures, OI, volume) at
+least 2012+; insider/PIT trades with buy/sell/mode 2019+; quarterly results per company many
+years; shareholding pattern ~5 years; bulk-deal history endpoint returned 503. No archive for
+sector/tax/scam news: hand-built calendar (Budget, GST Council, RBI) + scam list; GDELT (free
+news DB, 2015+) to evaluate; forward news/PIB headlines on the Pi with Gemini tagging.
+  Weeks 1-2: build data (F&O first), event calendar, scam list.
+  Weeks 3-6: test each signal alone (vs same stock's ordinary days, learn old / check new).
+  Weeks 7-9: combine survivors into one selection score (time-split model) vs momentum/random.
+  Weeks 10-12: Pi computes the score weekly and paper-trades it next to the current books.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 

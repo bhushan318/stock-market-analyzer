@@ -219,3 +219,27 @@ def test_weekly_winner_label_ignores_buy_day():
     g, hit = trade_outcome(O, H, L, C, 0, target=0.05, stop=0.05, hold=4, slip=0.0)
     assert list(hit) == [0, 1, -1, -1]
     assert np.allclose(g, [1.0, 1.05, 0.95, 0.95])   # stock 0: time exit at the close of session 5
+
+
+def test_stagger_entries_one_per_rebalance_and_entry_rank():
+    costs = load_config()["costs"]
+    T = 20
+    order = {0: np.array([0, 1, 2, 3]), 5: np.array([0, 1, 2, 3]), 10: np.array([0, 1, 2, 3])}
+    O = _flat(T, [100, 100, 100, 100])
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=4, max_new=1)
+    buys = sorted(t for t in [x for x in r["trades"]])  # nothing sold (all stay ranked)
+    assert r["trades"] == []
+    # one buy per rebalance: 25% invested after day 1, 50% after day 6, 75% after day 11
+    assert r["cash_share"][2] > 0.7 and 0.45 < r["cash_share"][7] < 0.55 and 0.2 < r["cash_share"][12] < 0.3
+    # entry_rank=2: only the top 2 are ever bought, the other slots stay in cash
+    r = simulate(O, O.copy(), order, 0, T, 20000, costs, n=4, entry_rank=2)
+    assert 0.45 < r["cash_share"][-1] < 0.55
+
+
+def test_overnight_alignment_uses_previous_us_session():
+    import pandas as pd
+    from trader.overnight_study import align_us
+    us = pd.Series([0.01, -0.02, 0.03], index=pd.to_datetime(["2026-11-26", "2026-11-27", "2026-11-30"]))
+    india = pd.DatetimeIndex(["2026-11-27", "2026-11-30", "2026-12-01"])
+    # Fri India <- Thu US; Mon India <- Fri US (not Monday's, which closes after India); Tue <- Mon US
+    assert list(align_us(us, india)) == [0.01, -0.02, 0.03]

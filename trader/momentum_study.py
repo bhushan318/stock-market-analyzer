@@ -101,7 +101,8 @@ def signal_test(sig, O, C, rebal):
 
 def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss=False,
              rng=None, hold_dist=None, stuck_days=60, min_val=1500,
-             regime=None, regime_exit=False, target=None, stop_k=None, vol=None, intraday=None):
+             regime=None, regime_exit=False, target=None, stop_k=None, vol=None, intraday=None,
+             max_new=None, entry_rank=None):
     """Weekly rotation. O, C: numpy (T x N); C forward-filled for marking.
 
     Optional rules (all off by default; applied the same way in random mode):
@@ -110,6 +111,9 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
       target      sell when the position is up this much after all charges (checked every close).
       stop_k, vol sell when the close falls below buy price x (1 - stop_k * vol * sqrt(20)), with
                   vol = T x N daily-return std known on the decision day (checked every close).
+      max_new     at most this many new buys per rebalance (stagger entries; None = fill all slots).
+      entry_rank  only buy stocks ranked better than this (e.g. 3 = top 3 only); random mode draws
+                  from the same top-entry_rank set, so the control matches.
       intraday    (H, L) numpy arrays: target/stop become standing orders (Zerodha GTT-like)
                   checked against each day's high/low from the day after the buy (CNC). Target fills
                   at the target price (or the open if it gaps above), stop at the stop price or the
@@ -128,7 +132,7 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
     sells, buys = set(), []
     stop_px, tgt_px = {}, {}
     rate = sell_rate(costs)
-    eq, stuck, trades = [], [], []
+    eq, stuck, trades, cash_share = [], [], [], []
     charges = 0.0
     prev_equity = cash
     for i in range(i0, i1):
@@ -204,6 +208,7 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
         prev_equity = equity
         eq.append(equity)
         stuck.append(stk / equity)
+        cash_share.append(cash / equity)
         if intraday is None and (target is not None or stop_k is not None) and i + 1 < i1:
             for j, (sh, basis, bi, _) in pos.items():
                 if j in sells:
@@ -237,7 +242,10 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
         slot = equity / n
         if free <= 0 or slot < min_val:
             continue
-        cands = rng.permutation(ranked) if rand else ranked
+        pool = ranked if entry_rank is None else ranked[:entry_rank]
+        cands = rng.permutation(pool) if rand else pool
+        if max_new is not None:
+            free = min(free, max_new)
         for j in cands:
             if free == 0:
                 break
@@ -248,6 +256,7 @@ def simulate(O, C, order, i0, i1, capital, costs, n=N_POS, exit_rank=20, no_loss
             free -= 1
     eq = np.array(eq)
     return {"equity": eq, "stuck": np.array(stuck), "trades": trades, "charges": charges,
+            "cash_share": np.array(cash_share),
             "open_underwater": sum(1 for j, (sh, b, _, _) in pos.items() if sh * C[i1 - 1, j] < b)}
 
 
