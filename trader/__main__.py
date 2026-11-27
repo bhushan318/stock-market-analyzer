@@ -220,8 +220,8 @@ def cmd_exits(cfg, args):
 
 
 def cmd_strategies(cfg, args):
-    from .strategies import run_strategies
-    run_strategies(cfg)
+    from .strategies import run_stage2, run_strategies
+    run_stage2(cfg) if args.stage == 2 else run_strategies(cfg)
 
 
 def cmd_fno(cfg, args):
@@ -307,7 +307,8 @@ def main():
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
     c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
-    sub.add_parser("strategies", help="popular swing strategies on one engine, 2006-2026 (stage 1)")
+    sub.add_parser("strategies", help="popular swing strategies on one engine, 2006-2026").add_argument(
+        "--stage", type=int, default=1, help="1 = each strategy alone, 2 = combinations")
     fo = sub.add_parser("fno", help="NSE F&O bhavcopy history -> per-underlying daily totals (data/fno.db, PC)")
     fo.add_argument("job", choices=["fetch", "status"])
     fo.add_argument("--start", default="2008-01-01")

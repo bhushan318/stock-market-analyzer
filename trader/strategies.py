@@ -250,3 +250,77 @@ def run_strategies(cfg):
     print("\n=== Do they win at different times? daily-return correlation, learn 2006-16 ===")
     print(lr.corr().round(2).to_string())
     print(f"\nCSV: {out}/strategies_stage1.csv, strategies_corr_learn.csv")
+
+
+# ---------------------------------------------------------------- stage 2: "best of all worlds"
+# Chosen from the LEARN period only (Results 17): the market filter helped nearly every strategy;
+# trend strategies with few, long trades worked (minervini, supertrend, golden, breakout52) while
+# the short-hold ones (rsi2, ema20, nr7: 110-130 trades/yr) lost to charges. Two combinations:
+#   confluence  one rule that needs several strategies to agree: Minervini trend template AND
+#               Supertrend up AND momentum-combo rank in the top 20%, entered on a 20-day-high
+#               close with volume >= 1.5x; exit on close < SMA50, Supertrend down, or -8%;
+#               priority = momentum combo score.
+#   multi-book  run the learn-period survivors side by side, equal money each (diversification):
+#               momentum combo (weekly, Gate 1 rule), minervini, supertrend, golden, breakout52.
+# All with the market filter. Judged on tune 2017-19 and TEST 2020-26, then forward paper.
+
+def run_stage2(cfg):
+    from .momentum_pit import _orders
+    from .momentum_study import simulate, weekly_dates
+    print("Loading 2005-2026 panel ...", flush=True)
+    p = load_panel(db=[ROOT / "data" / "history.db", ROOT / "data" / "market.db"], start="2005-01-01")
+    C, cal = p["C"], p["cal"]
+    sig, elig = pit_signals(C, p["TO"], liquid_universe(C, p["TO"]))
+    combo = sig["combo"]
+    n5 = download_prices(["^CRSLDX"], "2005-01-01", ROOT / cfg["data"]["cache_dir"], 12)["^CRSLDX"]["Close"]
+    n5 = n5.reindex(cal.union(n5.index)).ffill().reindex(cal)
+    regime = ((n5 > n5.rolling(200, min_periods=150).mean()) | n5.isna()).to_numpy()
+    S, mom12 = build_signals(p, elig)
+    Cc = C.ffill(limit=5)
+    s50, s150, s200 = sma(Cc, 50), sma(Cc, 150), sma(Cc, 200)
+    hi52, lo52 = Cc.rolling(252, min_periods=240).max(), Cc.rolling(252, min_periods=240).min()
+    v50 = p["V"].rolling(50, min_periods=40).mean()
+    st = supertrend_up(p["H"], p["L"], Cc)
+    tt = ((Cc > s50) & (s50 > s150) & (s150 > s200) & (s200 > s200.shift(21)) & (Cc >= 1.3 * lo52) & (Cc >= 0.75 * hi52))
+    conf_entry = (elig & tt & st & (combo >= 0.8) & (Cc > Cc.shift(1).rolling(20).max()) & (p["V"] >= 1.5 * v50))
+    conf_exit = (Cc < s50) | ~st
+    S["confluence"] = dict(entry=conf_entry, exit=conf_exit, stop_pct=0.08)
+    Oa, Cf = p["O"].to_numpy(), C.ffill().to_numpy()
+    pri = {"default": mom12.to_numpy(), "confluence": combo.to_numpy()}
+    rebal = weekly_dates(cal)
+    rebal = rebal[(rebal >= pd.Timestamp(SPLITS[0][1])) & (rebal < cal[-1])]
+    od = _orders(combo, [cal.get_loc(d) for d in rebal])
+    books = ["minervini", "supertrend", "golden", "breakout52", "confluence"]
+    rows = []
+    for sp, a, b in SPLITS:
+        i0, i1 = cal.searchsorted(pd.Timestamp(a)), min(cal.searchsorted(pd.Timestamp(b) + pd.Timedelta(days=1)), len(cal))
+        curves = {}
+        for name in books:
+            s = S[name]
+            res = run_book(Oa, Cf, s["entry"].fillna(False).to_numpy(), pri.get(name, pri["default"]),
+                           s["exit"].fillna(False).to_numpy(), i0, i1, cfg["costs"], stop_pct=s.get("stop_pct"),
+                           stop_level=s["stop_level"].to_numpy() if "stop_level" in s else None,
+                           target_r=s.get("target_r"), max_hold=s.get("max_hold"), regime=regime)
+            curves[name] = res["equity"] / CAPITAL
+            rows.append({"split": sp, "portfolio": name, **book_stats(res)})
+        mres = simulate(Oa, Cf, od, i0, i1, CAPITAL, cfg["costs"], exit_rank=50, regime=regime)
+        curves["momentum"] = mres["equity"] / CAPITAL
+        rows.append({"split": sp, "portfolio": "momentum (Gate 1)", **book_stats(mres)})
+        multi = np.mean([curves[k] for k in ("momentum", "minervini", "supertrend", "golden", "breakout52")], axis=0)
+        yrs = len(multi) / 248
+        rows.append({"split": sp, "portfolio": "MULTI-BOOK (5 equal)", "cagr": multi[-1] ** (1 / yrs) - 1,
+                     "max_dd": float((multi / np.maximum.accumulate(multi) - 1).min())})
+        rows.append({"split": sp, "portfolio": "Nifty 500", "cagr": (n5.iloc[i1 - 1] / n5.iloc[i0]) ** (248 / (i1 - i0)) - 1,
+                     "max_dd": float((n5.iloc[i0:i1] / n5.iloc[i0:i1].cummax() - 1).min())})
+    R = pd.DataFrame(rows)
+    out = ROOT / cfg["backtest"]["output_dir"]
+    R.to_csv(out / "strategies_stage2.csv", index=False)
+    piv = R.pivot(index="portfolio", columns="split", values="cagr")[[s for s, _, _ in SPLITS]]
+    dd = R.pivot(index="portfolio", columns="split", values="max_dd")[[s for s, _, _ in SPLITS]]
+    show = piv.map(lambda v: f"{v:+.0%}") + " (" + dd.map(lambda v: f"{v:.0%}") + ")"
+    print("\n=== Stage 2, all with the market filter: per year after charges (worst fall) ===")
+    print(show.to_string())
+    t = R[(R.split == SPLITS[0][0]) & R.trades_yr.notna()][["portfolio", "trades_yr", "win_rate", "avg_win", "avg_loss", "median_hold"]]
+    print("\nTrade profile, learn 2006-16:")
+    print(t.round(3).to_string(index=False))
+    print(f"\nCSV: {out}/strategies_stage2.csv")

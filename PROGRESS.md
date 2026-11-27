@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (forward-only approach; selection data collected daily on the Pi).
+Last updated: 2026-11-27 (Results 17: popular strategies + best-of-all-worlds study).
 
 ## Where we are
 
@@ -460,6 +460,39 @@ price before anyone can buy at 09:15); after the open there is a small reversal 
 Use only as an entry nudge: avoid chasing a big gap-up open, gap-down opens after a US sell-off
 are slightly better entries. Also: open -> close is negative on average (−0.1 to −0.2%) - buying
 later in the day than the open may be marginally cheaper (to test with the simulator).
+
+### 17. Popular swing strategies and "best of all worlds" (2026-11-27, `python -m trader strategies [--stage 2]`)
+Owner asked to study published strategies (books, Reddit, Indian setups) and combine the best.
+One daily engine (trader/strategies.py): point-in-time top 500, 5 slots, Rs 25k, all charges,
+decide at close / fill next open. Learn 2006-16, tune 2017-19, TEST 2020-26. Per year (worst fall):
+
+| strategy (with market filter) | learn 2006-16 | tune 2017-19 | TEST 2020-26 | trades/yr | win rate | avg win / loss |
+|---|---|---|---|---|---|---|
+| **Minervini trend template + breakout** | **+19%** (−42%) | +11% (−54%) | **+30%** (−56%) | 23-28 | 30-34% | +31-35% / −8% |
+| Supertrend(10,3) flip | +12% (−38%) | +9% (−40%) | +25% (−26%) | 17-24 | 39-43% | +26% / −11% |
+| golden cross 50/200 | +13% (−40%) | +16% (−18%) | +5% (−44%) | 5-7 | 35-42% | +60-89% / −14-21% |
+| 52-week-high breakout on volume | +13% (−40%) | +5% (−39%) | +8% (−55%) | 20-22 | 38-44% | +23% / −10% |
+| 20-EMA pullback | +12% (−45%) | −6% | −4% | 113 | 38% | +10% / −6% |
+| Connors RSI(2) | −11% | −4% | +10% | 119 | 54% | +3.5% / −5% |
+| NR7 squeeze breakout | 0% | −11% | 0% | 134 | 39% | +8% / −6% |
+| momentum combo (Gate 1) | +17% (−78%) | −1% (−55%) | +59% (−35%) | 16 | 45% | +38% / −15% |
+| **MULTI-BOOK** (momentum, minervini, supertrend, golden, breakout52; equal money) | +15% (−45%) | +8% (−38%) | **+35% (−27%)** | | | |
+| confluence (all must agree) | +22% (−37%) | −4% (−51%) | +3% (−57%) | 25 | 40% | +27% / −8% |
+| Nifty 500 | +10% (−64%) | +12% (−16%) | +14% (−38%) | | | |
+Without the market filter nearly every strategy is worse (filter helps for the 3rd time).
+
+Reading:
+- Trend-following with few, long trades works; short-hold strategies (RSI2, EMA20, NR7) lose to
+  charges even with a 54% win rate. Winners all: 30-45% win rate, wins 3-4x the losses.
+- Minervini alone is the most consistent single strategy (beats the index in all three periods).
+- "Confluence" (best learn result, 22%) collapsed in tune/test: requiring everything to agree
+  overfits - rejected. The diversified MULTI-BOOK is the better "best of all worlds": beats the
+  index in learn and test with the smallest test drawdown (−27%), lags in 2017-19 like most.
+- Against the 18% after-tax target (~22-23% pre-tax): only 2020-26 clears it (Minervini 30%,
+  multi-book 35%); 2006-19 gives 11-19% pre-tax. Drawdowns 38-56% remain -> keep the 75/25 split
+  with the timed index fund (Results 12) for real money.
+Next (proposed): forward paper books on the Pi for minervini, supertrend, golden, breakout52 and
+the multi-book view, next to the running momentum books; weekly Telegram comparison.
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
