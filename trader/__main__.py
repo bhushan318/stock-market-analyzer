@@ -214,6 +214,11 @@ def cmd_levers(cfg, args):
     run_levers(cfg)
 
 
+def cmd_paper(cfg, args):
+    from .paper import main as paper_main
+    paper_main(cfg, args)
+
+
 def cmd_collect(cfg, args):
     from .collect import main as collect_main
     collect_main(cfg, args)
@@ -241,6 +246,10 @@ def main():
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
     c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
+    pp = sub.add_parser("paper", help="Gate 1 paper trading (no real orders): init / run / status / chatid")
+    pp.add_argument("job", choices=["init", "run", "status", "chatid"])
+    pp.add_argument("--force", action="store_true", help="init: wipe and restart the paper books")
+    pp.add_argument("--quiet", action="store_true", help="run: print only, no Telegram")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
                                        help="broad index/asset-class ETFs only")
     p = sub.add_parser("picks")
@@ -253,7 +262,7 @@ def main():
     if args.cmd == "picks" and args.cash is None:
         args.cash = cfg["capital"]
     {"evaluate": cmd_evaluate, "backtest": cmd_backtest, "picks": cmd_picks,
-     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect}[args.cmd](cfg, args)
+     "ideas": cmd_ideas, "etf": cmd_etf, "mixed": cmd_mixed, "universe": cmd_universe, "momentum": cmd_momentum, "momentum-pit": cmd_momentum_pit, "delivery": cmd_delivery, "combo": cmd_combo, "robust": cmd_robust, "levers": cmd_levers, "collect": cmd_collect, "paper": cmd_paper}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":

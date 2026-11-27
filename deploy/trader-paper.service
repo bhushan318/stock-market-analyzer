@@ -1,0 +1,10 @@
+[Unit]
+Description=Paper trading (Gate 1): fill orders, mark to market, weekly decision + Telegram
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/stock-market-analyzer
+ExecStart=%h/stock-market-analyzer/.venv/bin/python -m trader paper run
+TimeoutStartSec=30min

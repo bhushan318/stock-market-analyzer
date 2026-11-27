@@ -1,0 +1,10 @@
+[Unit]
+Description=Paper trading: weekdays 20:30 IST (after the 19:30 collector), Saturday 11:00 catch-up
+
+[Timer]
+OnCalendar=Mon..Fri 20:30 Asia/Kolkata
+OnCalendar=Sat 11:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

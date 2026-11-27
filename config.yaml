@@ -107,3 +107,16 @@ collect:                     # NSE data collectors (python -m trader collect ...
   store_all: true            # every EQ/BE stock (~2,300/day, ~700 MB for 2020+): needed for a point-in-time
                              # universe incl. stocks that later collapsed. false = Nifty 500 + ETFs + extras
   extra_symbols: []
+
+paper:                         # Gate 1 paper trading (trader/paper.py) - no real orders
+  capital: 100000              # per book: strategy part + Nifty 500 index-fund part
+  strategy_share: 0.25         # owner's choice 2026-11-27 (75/25 keeps the worst fall ~21% in 2021-26)
+  positions: 5
+  exit_rank: 50                # sell when out of the top 50
+  regime_ma: 200               # no new buys/sells while Nifty 500 is below this moving average
+  etf_fee: 0.002               # index-fund expense ratio per year
+  history_days: 800            # calendar days of market.db loaded for the signals
+  db: data/paper.db
+  books:                       # name: universe
+    main: top500
+    large: top200

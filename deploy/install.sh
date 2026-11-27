@@ -10,10 +10,10 @@ cd "$(dirname "$0")/.."
 mkdir -p ~/.config/systemd/user
 cp deploy/*.service deploy/*.timer ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now trader-collect-daily.timer trader-collect-news.timer
+systemctl --user enable --now trader-collect-daily.timer trader-collect-news.timer trader-paper.timer
 # keep user timers running when you are not logged in
 sudo loginctl enable-linger "$USER"
 
 echo; systemctl --user list-timers 'trader-*'
-echo; echo "Logs:   journalctl --user -u trader-collect-daily -u trader-collect-news -n 50"
+echo; echo "Logs:   journalctl --user -u trader-collect-daily -u trader-collect-news -u trader-paper -n 50"
 echo "Status: .venv/bin/python -m trader collect status"
