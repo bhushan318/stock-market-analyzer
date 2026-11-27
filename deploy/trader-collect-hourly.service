@@ -1,0 +1,10 @@
+[Unit]
+Description=Yahoo 1-hour price bars for today's Nifty 500 (last few days; first run ~2 years)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/stock-market-analyzer
+ExecStart=%h/stock-market-analyzer/.venv/bin/python -m trader collect hourly
+TimeoutStartSec=60min

@@ -3,6 +3,7 @@
     python -m trader collect daily              # bhavcopy (+ catch-up), deals, FII/DII
     python -m trader collect news               # announcements + results RSS (+ deals, FII/DII)
     python -m trader collect backfill --start 2020-01-01
+    python -m trader collect hourly             # Yahoo 1-hour bars, today's Nifty 500 (see hourly.py)
     python -m trader collect status
 """
 
@@ -243,6 +244,9 @@ def main(cfg, args):
     elif args.job == "backfill":
         run_backfill(cfg, date.fromisoformat(args.start),
                      date.fromisoformat(args.end) if args.end else None, weekends=args.weekends)
+    elif args.job == "hourly":
+        from .hourly import collect_hourly
+        print(collect_hourly(connect(db_path(cfg))))
     elif args.job == "status":
         status(cfg)
     elif args.job == "export":

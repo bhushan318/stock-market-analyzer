@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly bars: weekdays 18:00 IST (after the close, before the 19:30 bhavcopy run)
+
+[Timer]
+OnCalendar=Mon..Fri 18:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

@@ -142,3 +142,33 @@ def test_bhavcopy_served_as_xlsx_is_parsed():
     r = rows[0]
     assert (r["date"], r["symbol"], r["series"], r["close"], r["volume"], r["deliv_pct"]) == \
         ("2022-08-08", "ABC", "EQ", 104.5, 1000, 60.0)
+
+
+def test_old_bhavcopy_format():
+    from datetime import date
+    from trader.history import old_bhavcopy_url, parse_old_bhavcopy
+    assert old_bhavcopy_url(date(2008, 1, 21)).endswith("/EQUITIES/2008/JAN/cm21JAN2008bhav.csv.zip")
+    text = ("SYMBOL,SERIES,OPEN,HIGH,LOW,CLOSE,LAST,PREVCLOSE,TOTTRDQTY,TOTTRDVAL,TIMESTAMP,\n"
+            "3IINFOTECH,EQ,132,132,111,117.75,117.75,131.5,1006260,118590976.85,21-JAN-2008,\n"
+            "3MINDIA,EQ,584,585,580,581.1,581,575.55,1387,808306.35,3-JAN-2005,\n"
+            "XYZ,N1,100,100,100,100,100,100,1,100,21-JAN-2008,\n")
+    rows = parse_old_bhavcopy(text)
+    assert [r["symbol"] for r in rows] == ["3IINFOTECH", "3MINDIA"]
+    r = rows[0]
+    assert (r["date"], r["open"], r["low"], r["close"], r["volume"]) == ("2008-01-21", 132.0, 111.0, 117.75, 1006260)
+    assert abs(r["turnover_lacs"] - 1185.9097685) < 1e-6 and rows[1]["date"] == "2005-01-03"
+
+
+def test_hourly_frame_to_rows():
+    import numpy as np
+    import pandas as pd
+    from trader.hourly import frame_to_rows
+    idx = pd.DatetimeIndex(["2026-11-26 09:15", "2026-11-26 10:15", "2026-11-26 11:15"], tz="Asia/Kolkata")
+    df = pd.DataFrame({"Open": [100, np.nan, 101], "High": [102, 1, 103], "Low": [99, 1, 0],
+                       "Close": [101, 1, 102], "Volume": [1000, 5, np.nan]}, index=idx)
+    rows = frame_to_rows(df, "TCS")   # NaN row and zero-low row dropped
+    assert rows == [{"ts": "2026-11-26T09:15", "symbol": "TCS", "open": 100.0, "high": 102.0,
+                     "low": 99.0, "close": 101.0, "volume": 1000}]
+    utc = df.iloc[:1].copy()
+    utc.index = pd.DatetimeIndex(["2026-11-26 03:45"])  # naive = UTC -> 09:15 IST
+    assert frame_to_rows(utc, "TCS")[0]["ts"] == "2026-11-26T09:15"
