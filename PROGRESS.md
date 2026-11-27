@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 10: exits with intraday high/low; Gate 1 running).
+Last updated: 2026-11-27 (Results 11: out-of-sample 2006-2019; data on external disk; hourly bars).
 
 ## Where we are
 
@@ -19,7 +19,11 @@ satellite next to a Nifty 500 ETF core.
 2026-11-27: owner chose 75% Nifty 500 index fund / 25% strategy on Rs 1 lakh. **Gate 1 paper
 trading started on the Pi** (`trader/paper.py`, timer 20:30 IST; books valued from the 26-Nov
 close; first decision on Friday 27-Nov close, fills Monday's open). Waiting for the owner's
-Telegram bot token + chat id in the Pi's .env (until then reports go to the journal only).**
+Telegram bot token + chat id in the Pi's .env (until then reports go to the journal only).
+Later 2026-11-27: Telegram connected (@trade318bot, set up via Raspberry Pi Connect remote shell);
+data/ moved to the external disk (ext4 image /mnt/ehd/pi-data/sma.img at /mnt/sma, symlink);
+hourly Yahoo bars collected (eq_hourly, Dec 2023+, timer weekdays 18:00); out-of-sample test
+2006-2019 done (Results 11): edge small (~+3.5%/yr pre-tax), crashes as deep as the index or worse.**
 
 ## The plan (agreed with the owner)
 
@@ -285,6 +289,37 @@ Reading:
   losers that never come back; all 5 slots end underwater; worse than random and the index.
   Rejected for the 4th time, now with the fairer intraday targets.
 - Keep the Gate 1 rule (rank exit, no target). A volatility stop is neutral (−1%/yr, same DD).
+
+### 11. Out of sample 2006-2019 (2026-11-27, `python -m trader history fetch` + `longrun`)
+Owner's concern: 2021-2026 is mostly a bull market. Old NSE bhavcopies (2005-2019, 3,700 days,
+5.06M rows incl. later-dead stocks) in data/history.db on the PC; same rules, nothing re-tuned.
+Universe thinner early (eligible 158/week in 2006 -> 383 in 2019: nominal Rs 2 cr turnover floor).
+Nifty 500 Jul 2006 -> 2019: 10.5%/yr, worst fall −64% (2008).
+
+| variant (Rs 25k alone) | Rs 25k -> | per yr | random | worst fall | 1y windows losing | 3y beat random / N500 | worst 3y |
+|---|---|---|---|---|---|---|---|
+| **Gate 1 rule (W50 + 200d filter)** | 1.41 L | **14%** | 10% | **−78%** | 26% | 74% / 69% | −14%/yr |
+| W50, no filter | 1.06 L | 11% | 5% | −73% | 40% | 71% / 55% | −22%/yr |
+| W20, no filter (Results 7) | 0.71 L | 8% | 2% | −73% | 46% | 83% / 45% | −20%/yr |
+| top 200 only + filter | 0.78 L | 9% | 8% | −85% | 38% | 76% / 60% | −7%/yr |
+75/25 mix on Rs 1 lakh (Gate 1 rule + Nifty 500): Rs 4.56 L, 12.0%/yr vs index 10.5%, worst fall −68%.
+
+By year (Nifty 500 / strategy / 75-25 mix): 2007 +61/+99/+70, **2008 −57/−72/−61**, 2009 +89/+108/+93,
+2010 +13/−14/+6, 2011 −28/+6/−19, 2013 +3/−14/−2, 2014 +38/+132/+61, 2016 +3/−2/+2,
+**2018 −3/−38/−12** (mid/small crash: strategy −41% vs index −14%).
+
+Reading (honest):
+- The edge survives out of sample but is SMALL: ~+3.5%/yr over the index before tax (14 vs 10.5),
+  not the 44% of 2021-26. After 20% STCG on the strategy part vs 12.5% LTCG on an index fund the
+  after-tax gap is roughly +1.5-2%/yr. The 75/25 mix: +1.5%/yr over the index.
+- Market filter (block new buys) helped again (14% vs 11%, fewer losing years) - now supported on
+  two separate periods. W20 and "top 200 only" were worse here -> keep the Gate 1 rule as is.
+- Crashes: the filter does NOT protect holdings already bought. 2008: strategy −78%, index −64%,
+  75/25 mix −68%. The owner's 25% pain limit is broken by the index itself in 2008 (−64%) and
+  2010-11 (−32%): with 100% in equities no mix keeps falls under 25% in a real crash.
+- Next to test (owner to decide): protect the WHOLE portfolio in crashes - e.g. hold the index
+  fund only while Nifty 500 > 200-day average (else a liquid/debt fund), and/or sell the
+  strategy stocks when the filter turns off (whipsaw cost in 2021-26, Results 8, vs crash saving).
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 

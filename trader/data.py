@@ -52,7 +52,8 @@ def download_prices(tickers, start, cache_dir="data/cache", max_age_hours=12, re
     import yfinance as yf
 
     import hashlib
-    tag = hashlib.md5(",".join(sorted(tickers)).encode()).hexdigest()[:8]
+    # the start date is part of the key: a cache saved for a shorter history must not be reused
+    tag = hashlib.md5((",".join(sorted(tickers)) + f"|{start}").encode()).hexdigest()[:8]
     cache = Path(cache_dir) / f"prices_{tag}.pkl"
     if cache.exists() and not refresh:
         age_h = (time.time() - cache.stat().st_mtime) / 3600
