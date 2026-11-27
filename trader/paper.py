@@ -171,6 +171,44 @@ def show_chat_ids():
     print("Add TELEGRAM_CHAT_ID=<id> to .env")
 
 
+def set_env(updates, path=None):
+    """Write KEY=VALUE lines into .env (replacing existing keys), readable only by the owner."""
+    path = path or ROOT / ".env"
+    lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
+    keep = [ln for ln in lines if ln.split("=", 1)[0].strip() not in updates]
+    keep += [f"{k}={v}" for k, v in updates.items()]
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(keep) + "\n")
+    os.chmod(path, 0o600)
+
+
+def setup_telegram():
+    """Interactive: paste the BotFather token (hidden), press Start in the bot, done."""
+    import getpass
+    tok = getpass.getpass("Paste the bot token from BotFather (hidden, then Enter): ").strip()
+    r = requests.get(f"https://api.telegram.org/bot{tok}/getMe", timeout=20)
+    if not r.ok:
+        raise SystemExit("Telegram rejected that token - copy it again from BotFather.")
+    bot = r.json()["result"]["username"]
+    print(f"Token OK (bot @{bot}). Now open @{bot} in Telegram and press Start (or send 'hi').")
+    print("Waiting up to 3 minutes ...")
+    chat, t0, offset = None, time.time(), None
+    while chat is None and time.time() - t0 < 180:
+        r = requests.get(f"https://api.telegram.org/bot{tok}/getUpdates",
+                         params={"timeout": 20, **({"offset": offset} if offset else {})}, timeout=30)
+        for u in r.json().get("result", []):
+            offset = u["update_id"] + 1
+            c = (u.get("message") or {}).get("chat", {})
+            if c.get("type") == "private":
+                chat = c["id"]
+    if chat is None:
+        raise SystemExit("No message arrived - press Start in the bot and run this again.")
+    set_env({"TELEGRAM_BOT_TOKEN": tok, "TELEGRAM_CHAT_ID": str(chat)})
+    ok = telegram("Paper-trading bot connected. Weekly picks arrive Friday ~20:35 IST, fills Monday evening. "
+                  "Paper only - no real money.")
+    print("Saved to .env." + (" Test message sent - check Telegram." if ok else " But the test message failed."))
+
+
 # ---------------------------------------------------------------- market data
 
 def market(cfg):
@@ -419,6 +457,8 @@ def status(cfg):
 def main(cfg, args):
     if args.job == "chatid":
         return show_chat_ids()
+    if args.job == "telegram":
+        return setup_telegram()
     if args.job == "init":
         return init(cfg, force=args.force)
     if args.job == "status":

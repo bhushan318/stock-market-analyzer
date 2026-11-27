@@ -44,3 +44,13 @@ def test_rebalance_and_decision_day():
     assert not is_decision_day(fri, fri, {"2026-W48"})
     assert not is_decision_day(thu, thu, set())                          # Friday may still trade
     assert is_decision_day(thu, date(2026, 11, 28), set())               # holiday Friday: Saturday run
+
+
+def test_set_env_replaces_keys(tmp_path):
+    from trader.paper import load_env, set_env
+    p = tmp_path / ".env"
+    p.write_text("GEMINI_API_KEY=abc\nTELEGRAM_CHAT_ID=1\n")
+    set_env({"TELEGRAM_BOT_TOKEN": "t:1", "TELEGRAM_CHAT_ID": "42"}, p)
+    env = load_env(p)
+    assert env["GEMINI_API_KEY"] == "abc" and env["TELEGRAM_CHAT_ID"] == "42" and env["TELEGRAM_BOT_TOKEN"] == "t:1"
+    assert p.read_text().count("TELEGRAM_CHAT_ID") == 1

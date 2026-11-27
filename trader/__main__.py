@@ -246,8 +246,8 @@ def main():
     c.add_argument("--start", default="2020-01-01", help="backfill start date")
     c.add_argument("--end", help="backfill end date (default today)")
     c.add_argument("--weekends", action="store_true", help="backfill: try weekend special sessions only")
-    pp = sub.add_parser("paper", help="Gate 1 paper trading (no real orders): init / run / status / chatid")
-    pp.add_argument("job", choices=["init", "run", "status", "chatid"])
+    pp = sub.add_parser("paper", help="Gate 1 paper trading (no real orders): init / run / status / telegram (setup) / chatid")
+    pp.add_argument("job", choices=["init", "run", "status", "chatid", "telegram"])
     pp.add_argument("--force", action="store_true", help="init: wipe and restart the paper books")
     pp.add_argument("--quiet", action="store_true", help="run: print only, no Telegram")
     sub.add_parser("etf").add_argument("--broad", action="store_true",
