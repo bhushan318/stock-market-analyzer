@@ -186,3 +186,27 @@ def test_news_parse_and_entry_day():
     assert event_entry_index("2026-11-26T11:00:00", cal) == 2   # during market: next session
     assert event_entry_index("2026-11-27T19:00:00", cal) == 3   # Friday evening: Monday
     assert event_entry_index("2026-11-28T10:00:00", cal) == 3   # Saturday: Monday
+
+
+def test_fno_parsers_and_aggregate():
+    from trader.fno import aggregate, parse_contracts
+    old = ("INSTRUMENT,SYMBOL,EXPIRY_DT,STRIKE_PR,OPTION_TYP,OPEN,HIGH,LOW,CLOSE,SETTLE_PR,CONTRACTS,VAL_INLAKH,OPEN_INT,CHG_IN_OI,TIMESTAMP,\n"
+           "FUTSTK,ACC,31-Jan-2008,0,XX,1,1,1,900,900,10,1,5000,500,21-JAN-2008,\n"
+           "FUTSTK,ACC,28-Feb-2008,0,XX,1,1,1,905,905,2,1,1000,100,21-JAN-2008,\n"
+           "OPTSTK,ACC,31-Jan-2008,900,CE,1,1,1,20,20,7,1,3000,-200,21-JAN-2008,\n"
+           "OPTSTK,ACC,31-Jan-2008,880,PE,1,1,1,9,9,3,1,1500,300,21-JAN-2008,\n"
+           "OPTIDX,NIFTY,31-Jan-2008,5000,PE,1,1,1,9,9,100,1,99,9,21-JAN-2008,\n")
+    a = {r["symbol"]: r for r in aggregate(parse_contracts(old))}
+    acc = a["ACC"]
+    assert (acc["date"], acc["kind"], acc["fut_oi"], acc["fut_oi_chg"], acc["fut_contracts"], acc["fut_close"]) == \
+        ("2008-01-21", "stock", 6000.0, 600.0, 12.0, 900.0)
+    assert (acc["ce_oi"], acc["ce_oi_chg"], acc["pe_oi"], acc["pe_contracts"]) == (3000.0, -200.0, 1500.0, 3.0)
+    assert a["NIFTY"]["kind"] == "index" and a["NIFTY"]["pe_contracts"] == 100.0
+    new = ("TradDt,BizDt,Sgmt,Src,FinInstrmTp,FinInstrmId,ISIN,TckrSymb,SctySrs,XpryDt,FininstrmActlXpryDt,StrkPric,OptnTp,"
+           "FinInstrmNm,OpnPric,HghPric,LwPric,ClsPric,LastPric,PrvsClsgPric,UndrlygPric,SttlmPric,OpnIntrst,ChngInOpnIntrst,"
+           "TtlTradgVol,TtlTrfVal,TtlNbOfTxsExctd,SsnId,NewBrdLotQty,Rmks\n"
+           "2026-11-26,2026-11-26,FO,NSE,STO,1,,ABCAPITAL,,2026-12-29,2026-12-29,350.00,CE,X,0,0,0,70.40,70.40,70.40,413.5,65.94,52700,1550,3100,0,0,F1,1550,\n"
+           "2026-11-26,2026-11-26,FO,NSE,STF,2,,ABCAPITAL,,2026-12-29,2026-12-29,,,Y,0,0,0,414.0,414,410,413.5,414,155000,-1550,15500,0,0,F1,1550,\n")
+    b = aggregate(parse_contracts(new))[0]
+    assert (b["date"], b["symbol"], b["ce_oi"], b["ce_contracts"], b["fut_oi_chg"], b["fut_contracts"], b["fut_close"]) == \
+        ("2026-11-26", "ABCAPITAL", 52700.0, 2.0, -1550.0, 10.0, 414.0)
