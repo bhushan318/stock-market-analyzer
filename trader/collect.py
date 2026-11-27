@@ -169,6 +169,9 @@ def run_news(cfg):
             report[feed] = f"error: {e}"
     collect_deals(con, client, report)
     collect_fii_dii(con, client, report)
+    from .extra import SCHEMA as EXTRA_SCHEMA, collect_news_feeds  # business news RSS, hourly
+    con.executescript(EXTRA_SCHEMA)
+    report["business_news"] = collect_news_feeds(con)
     return report
 
 
