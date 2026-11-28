@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect NSE corporate announcements and results (RSS)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/stock-market-analyzer
+ExecStart=%h/stock-market-analyzer/.venv/bin/python -m trader collect news
+TimeoutStartSec=10min

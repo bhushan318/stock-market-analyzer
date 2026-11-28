@@ -1,0 +1,682 @@
+# PROGRESS.md — decisions, results, next steps
+
+Last updated: 2026-11-28 (Results 18: Rs 25k vs 1 lakh vs Rs 50k/month SIP).
+
+## Where we are
+
+**2026-11-26: Pi rebuilt, backfill complete (1,714 days 2020-26, every NSE stock), DB copied to
+the PC. Gate 0 run on point-in-time data (Results 7): only the momentum "combo" ranking beats
+random picks and Nifty 500 in every 3-year window, but with a −42% drawdown, a smaller edge in
+2024+, and heavy charges at Rs 20k. Levers and delivery % alone: no stock-picking edge.
+Results 8 (18 combo variants): the market filter "no new buys while Nifty 500 < 200-day avg"
+is the one change that helped consistently; slower rotation, Rs 1 lakh, stops and targets gave
+mixed, noisy results; never-sell-at-loss again weak. Every variant still falls 32-56% at worst.
+Results 9 (robustness, 2026-11-27): every neighbour of "W50 + filter" still beats random and
+Nifty 500 over 2021-26, but 2024+ returns scatter from 1% to 32%/yr and the filter's benefit is
+fragile (150-day filter = no filter in 2024+). Realistic expectation ~ index + 5%/yr, not 44%.
+Alone, the strategy fell >25% in 80% of 1-year windows; the owner's limit is 25% -> run it as a
+satellite next to a Nifty 500 ETF core.
+2026-11-27: owner chose 75% Nifty 500 index fund / 25% strategy on Rs 1 lakh. **Gate 1 paper
+trading started on the Pi** (`trader/paper.py`, timer 20:30 IST; books valued from the 26-Nov
+close; first decision on Friday 27-Nov close, fills Monday's open). Waiting for the owner's
+Telegram bot token + chat id in the Pi's .env (until then reports go to the journal only).
+Later 2026-11-27: Telegram connected (@trade318bot, set up via Raspberry Pi Connect remote shell);
+data/ moved to the external disk (ext4 image /mnt/ehd/pi-data/sma.img at /mnt/sma, symlink);
+hourly Yahoo bars collected (eq_hourly, Dec 2023+, timer weekdays 18:00); out-of-sample test
+2006-2019 done (Results 11): edge small (~+3.5%/yr pre-tax), crashes as deep as the index or worse.**
+
+## The plan (agreed with the owner)
+
+Systematic, data-backed **swing trading** (holding days to weeks) on Nifty 500 stocks (+ ETFs),
+max 5 positions, real money only after passing gates:
+
+| Gate | What | Money | Pass criteria |
+|---|---|---|---|
+| 0 Backtest | Everything testable on history: momentum/relative strength, delivery %, results reactions, lever sensitivities | ₹0 | Beats random picks **and** Nifty 500 buy-and-hold on rolling windows |
+| 1 Paper (3 months) | Full system live: 5 positions + shadow list of top 20-30 scored stocks | ₹0 | 75/25 mix beats Nifty 500 after charges (and tax noted); never falls more than 25% (changed 2026-11-27 from "< 10%", which this strategy fails often even when working) |
+| 2 Small live (2-3 months) | Real Zerodha orders | ₹20k | Live ≈ paper within ~1%; no operational errors |
+| 3 Scale | 25% → 50% → 100% of target capital, ~1 month each | partial | Risk limits held |
+
+Hard risk rules at every stage: ≤5 stocks, ≤25% of capital per stock, ≤2 stocks per sector,
+CNC only, account kill-switch at −10% from peak (no new buys until reviewed).
+
+Selection = fundamentals quality filter + sector "lever" outlook + momentum/trend + catalysts
+(results, announcements, deals, delivery %) — not price patterns alone.
+
+Phases: (1) universe + data collectors ✅ → (2) sector lever maps (~20 sectors; LLM drafts, owner
+reviews) + measured lever sensitivities → (3) news archive tagged by LLM → (4) weekly scoring →
+(5) paper portfolio + shadow list.
+
+## Open decisions
+
+- **Gate 1 setup (decided 2026-11-27):** combo momentum, weekly, exit out of top 50, no buys or
+  sells while Nifty 500 < 200-day average, 5 stocks; 25% of Rs 1 lakh in the strategy, 75% in a
+  Nifty 500 index fund, reset each January. Paper books: "main" (top 500) and "large" (top 200,
+  for comparison). Expectation: a few %/yr over the index, falls up to ~20-25%, some years behind.
+
+- **Exit rule:** owner leans "never sell at a loss" and believes good selection keeps stuck cases
+  rare. Agreed to test it: paper-track both (a) never-sell-at-loss and (b) target + thesis-break +
+  volatility-sized stop; compare returns and stuck rate (held >60 days underwater).
+- **LLM:** owner has Google AI Pro (app subscription, no API). Plan: free Gemini API key from
+  Google AI Studio, stored in `.env` (`GEMINI_API_KEY=...`), model name in config. Not created yet.
+  Only public news/filings go to it.
+- **Sector lever maps (decided 2026-11-25):** one-time job, drafted by Claude in a work session
+  (no API cost), not Gemini. Gemini is only for the recurring news tagging. Method: NSE's official
+  4-level industry classification (fetched from NSE, not LLM-labelled) -> Claude drafts levers per
+  sub-industry (direction, mechanism, lag, confidence, data series; no magnitudes) -> checked
+  against measured betas (Gate 0 step 4), disagreements flagged -> owner reviews. Refresh at each
+  March/September index rebalance or after a major policy change.
+- Universe: use official Nifty 500 list (+ liquidity filter), *not* an LLM-generated list
+  (LLM may only suggest extras that are verified against NSE's equity list).
+
+## Results so far (all after charges, before 20% STCG tax)
+
+### 1. Legacy code review
+`StockPrediction.py` results were unreliable: latest signal 1-5 days stale (dropna removed the
+newest rows), misaligned accuracy/F1, best model chosen on the test set, "expected 5-day return"
+= annual/50, no costs, 1-month test window. Replaced by `trader/`.
+
+### 2. Stock model: "hit +5.75% within 20 days" (Nifty 50, walk-forward)
+- AUC ≈ 0.60 (dev 2019-23 and holdout 2024-26); logreg ≥ gradient boosting on dev → `logreg`.
+- Top-5 hit rate 57% vs 41% base in holdout — modest edge, but the portfolio built on it
+  **did worse than random picks in 2024-26** (it favours volatile stocks that crash and get stuck).
+
+### 3. "Never sell at a loss" + 5% target, Nifty 50 stocks, ₹20k
+- Holdout 2024-26: ~3-11%/yr (path-sensitive), ~50% of capital stuck underwater; worst holding −74%
+  (TMPV), JIOFIN/ONGC/ADANIENT stuck 1.5+ years.
+- 10% stop-loss made it worse (holdout −0.5%/yr): 5% wins vs 10% losses + volatile picks + charges.
+- Market filter, uptrend filter, target decay, averaging down: none fixed the structural stuck-capital problem.
+
+### 4. ETF dip strategy (owner found it convincing, but feels it is "investing", not trading)
+Rule: rank ETFs by how far the close is below its 20-day average, buy the deepest dips into free
+slots, sell at +5% net, never at a loss. Data 2009-2026 (Yahoo ETF history starts 2009).
+- Targets 3-6% all similar; 4-5% is fine.
+- **Broad ETFs only** (NIFTYBEES, JUNIORBEES, BANKBEES, GOLDBEES, MON100, ITBEES, MAFANG):
+  ~16%/yr over 18y vs NIFTYBEES 13.8%; rolling 3-year windows: **0% losing**, worst +7.1%/yr,
+  beats NIFTYBEES 78%; rolling 1-year: 6% losing, worst −5%.
+- Sector ETFs are dangerous under no-loss: PSUBNKBEES −78% (2010-20), CPSE −56%, SILVER −61%.
+- Averaging down (30% reserve, add at −10%, max 2): ~2-3%/yr lower return, smoother.
+- ₹20k → ~₹3k/yr typical (~₹250/month) before tax; ₹1 lakh → ~₹16.7k/yr. Same % at any size;
+  6 slots max (8 slots > 7 ETFs leaves cash idle).
+- With 7 ETFs and 5-6 slots it re-buys the same ETF often (75% within 30 days), usually 2-4%
+  below the last sell price; 27-40% of re-buys are above the last sell (sold too early).
+- Untested ideas: only buy if below the 20-day average; never re-buy above last sell price;
+  expand to 12-15 broad ETFs (midcap 150, smallcap 250, momentum 30, value 20, global).
+- Seasonality: month-of-year pattern did not repeat (rank corr +0.11); last-3-trading-days-of-month
+  entries slightly better in both halves (+3-5% hit rate) — small, maybe an entry-timing rule later.
+- NSE lists 367 ETFs / 114 underlying indices; most are duplicates, debt/liquid, illiquid or sector.
+
+### 5. Stocks + ETFs, max 5 positions (2016-2026, rule-based stock dips in uptrend)
+| Setup | 10y CAGR | 1y losing | worst 1y | worst 3y |
+|---|---|---|---|---|
+| ETF only | 19.3% | 2.5% | −8.8% | +7.0% |
+| 4 ETF + 1 stock (N50) | 21.8% | 10% | −17.9% | +3.9% |
+| 3 ETF + 2 stock (N50) | 23.5% | 17.5% | −24.6% | +1.5% |
+| stocks only (N50 / N500) | 14.3% / 12.0% | 27.5% / 37.5% | | +0.4% / −6.5% |
+
+**Key finding: the price-only dip rule did not beat random stock picks (N50 or N500) in any setup.**
+Nifty 500 was worse than Nifty 50 for this rule. → motivates the fundamentals + catalysts approach.
+
+### 6. Gate 0 step 1: momentum on today's Nifty 500 (2026-11-25) - NOT TRUSTWORTHY YET
+`python -m trader momentum` (trader/momentum_study.py). Signals: 12-1 and 6-1 month return,
+distance to 52w high, 6m return vs sector median, combo. (Return vs Nifty = same ranking as raw
+return, so not separate.) Weekly ranking, 499 stocks, ~400 eligible (>= Rs 2 cr turnover).
+- Signal test (top decile minus average eligible, 20d forward, gross): 12-1 momentum +1.25%
+  (learn) / +0.91% (check 2024+), beats in 64-67% of weeks; 6-1 and sector RS faded in 2024+
+  (+0.3%); 52w-high ~0.
+- Portfolio (5 stocks, Rs 20k, sell when out of top 20, all charges): 12-1 momentum 44%/yr
+  2016-26 vs random 18%, Nifty 500 12.5%; 3y rolling windows beat random 91%.
+- **But** the whole gain comes from 10 of 128 trades (ADANIGREEN +828%, TTML, DIXON, CGPOWER,
+  APARINDS, TITAGARH, MAZDOCK ...); the other 118 trades net to a loss. These are exactly the
+  stocks that are in today's Nifty 500 *because* they multiplied -> survivorship bias. No data
+  glitches found. The real point-in-time Nifty 200 Momentum 30 ETF made +8.8%/yr since Aug 2022
+  vs Nifty 500 +11.4%, while our version showed +40%.
+- "Never sell at a loss" variant: lower return (28% vs 45% on the same biased data), stuck 27%.
+- 52w-high variant churns (5-day holds, 150 trades/yr) because many stocks tie at the high; ignore.
+- Note: `charges_pct_yr` is charges / *starting* capital per year, so it balloons as equity grows.
+- Fix needed: point-in-time universe (NSE full bhavcopy incl. later-collapsed stocks, liquidity
+  ranked each month, split/bonus adjusted) and/or the official Nifty 200 Momentum 30 index history
+  (niftyindices.com, point-in-time by construction) as the honest benchmark.
+
+### 7. Gate 0 on point-in-time data (2026-11-26, PC, NSE bhavcopy 2020-01 -> 2026-11-26)
+Universe each week = top 500 stocks by 6-month median turnover at that date (incl. stocks that
+later collapsed/delisted: 366 stopped trading). 5 stocks, Rs 20k, weekly ranking, sell when out of
+the top 20, all charges, no dividends, before 20% STCG. Learn 2021-23 / check 2024+ (the 2024+
+period was already seen in Results 6, so it is only partly fresh).
+
+**Data bug found and fixed first:** NSE's PREV_CLOSE is *not* split-adjusted, so the first run
+detected only 14 splits in 7 years and every split looked like a crash. Now opening-gap detection
+(752 events; MAZDOCK, IRCTC, RELIANCE, CDSL, TMPV demerger checked). Rights entitlements (-RE)
+dropped. Remaining liquid moves >25%/day: 16 in 5M stock-days, all real (Adani, Zee, IndusInd...).
+
+Momentum (`momentum-pit`), CAGR full 2021-26 / check 2024+:
+| variant | rule | random | Nifty 500 | 3y windows beat random / Nifty 500 | max DD | trades/yr | charges/yr* |
+|---|---|---|---|---|---|---|---|
+| mom12_1 | 15.9% / 24.1% | 11.3% / 0.4% | 13.3% / 7.7% | 33% / 33% | −50% | 14 | 1.8% |
+| mom6_1 | 6.2% / 13.2% | 11.6% / 1.9% | | 50% / 50% | −62% | 23 | 2.7% |
+| **combo** (12-1, 6-1, 52w-high ranks) | **31.5% / 12.7%** | 9.0% / −4.5% | | **100% / 100%** (median +24% / +20%/yr) | −42% | 59 | 11.5% |
+| mom12_1 never-sell-at-loss | 11.5% / 11.3% | 10.1% / 4.0% | | 50% / 33% | −45% | 4 | 0.6% |
+\* charges as % of the *starting* Rs 20k per year.
+- Survivorship bias measured: random picks from *today's* Nifty 500 make 26%/yr vs 11% from the
+  point-in-time universe; mom12_1 52% vs 16%. Results 6 was mostly this bias.
+- combo is the only candidate: beats random and Nifty 500 in every 3-year window, both halves.
+  Caveats: 2024+ edge much smaller (+5%/yr vs Nifty 500); −42% drawdown (Nifty 500 −19%);
+  profit concentrated in ~10 big winners (CUPID, COCHINSHIP, MTARTECH, IRFC, MIRZAINT); 59
+  trades/yr cost 11.5% of Rs 20k per year (DP Rs 15.93 per sell on ~Rs 4k positions).
+- Nifty 200 Momentum 30 ETF since 2022-08: +9.0%/yr vs Nifty 500 +11.3% (the real index lagged).
+- Never-sell-at-loss again ~= random, 30-43% of holdings stuck.
+
+Delivery % (`delivery`, same harness): delivery on its own has no edge (deliv_rel +7%,
+accum −7%, dq_rel −17% full period; random −2%... all crushed by 145-160 trades/yr = 17-22%
+charges). **accum_mom** (delivery accumulation + 12-1 momentum): 21.0% vs random 3.7%, check
+12.6% vs −10.5%, beats random in 92% of 3y windows but Nifty 500 only 33%; 114 trades/yr.
+
+Levers (`levers`, Yahoo 2016-26, 361 stocks): per-stock betas to crude/USDINR/gold/US10y keep
+their sign between halves only 50-58% of the time (coin flip) -> useless for stock picking.
+Industry level, stable: pharma/healthcare +0.41% per +1% USDINR, FMCG +0.23, IT +0.20;
+consumer durables and realty −0.23; metals +0.10 crude / +0.12 gold; US yields ~0. Small effects
+-> lever maps are context for sector tilts, not a signal.
+
+**Key practical finding: at Rs 20k, charges dominate any weekly-rotation strategy** (DP charge is
+0.4% of a Rs 4k sell). Test slower rotation (monthly, exit when out of top 50) and Rs 1 lakh.
+
+### 8. combo variants: turnover, capital, market filter, exits (2026-11-26, `python -m trader combo`)
+Point-in-time top 500, 5 stocks, 2021-01 -> 2026-11, after charges, no dividends, before STCG.
+Random control = random picks under the *same* rules (rebalance days, filter, stops). Nifty 500:
+13.3%/yr full, 19.1% learn, 7.7% check, max DD −19%; Rs 20k -> ~Rs 42k.
+W/M = weekly/monthly ranking, 20/50 = sell when out of the top 20/50.
+
+| variant | Rs 20k -> | full | random | check 2024+ | max DD | trades/yr | charges/yr | 3y beat random / N500 | worst 3y |
+|---|---|---|---|---|---|---|---|---|---|
+| W20 (Results 7) | 1.01 L | 32% | 9% | 13% | −42% | 59 | 12% | 100% / 100% | +17% |
+| W50 | 1.35 L | 38% | 11% | 1% | −44% | 27 | 6% | 75% / 92% | +7% |
+| M20 | 0.77 L | 26% | 8% | −6% | −51% | 29 | 5% | 50% / 58% | +4% |
+| M50 | 0.90 L | 29% | 19% | 8% | −54% | 16 | 3% | 75% / 83% | +10% |
+| **W50 + filter (block buys)** | **1.74 L** | **44%** | 19% | **11%** | **−36%** | 25 | 6% | **100% / 100%** | +15% |
+| M50 + filter (block buys) | 1.70 L | 44% | 12% | 30% | −49% | 14 | 3% | 92% / 100% | +15% |
+| W50 + filter (sell all) | 0.66 L | 23% | 10% | −3% | −43% | 30 | 6% | 92% / 92% | +9% |
+| W50 never-sell-at-loss | 0.53 L | 18% | 6% | 2% | −30% | 5 | 1% | 75% / 67% | +1% |
+| W50 + vol stop | 1.57 L | 42% | 14% | 1% | −43% | 27 | 6% | 83% / 92% | +5% |
+| W50 +15% target + stop | 0.32 L | 8% | 15% | −1% | −50% | 24 | 3% | 50% / 33% | −5% |
+| M50 +15% target + stop | 0.84 L | 28% | 17% | 12% | −32% | 21 | 4% | 92% / 100% | +19% |
+Rs 1 lakh (same rules): W20 34% (charges 9%/yr), W50 39%, M20 25%, M50 30% - a little better
+than Rs 20k, within path noise (W20 check 2024+: 13% at 20k vs 8% at 1 lakh just from rounding
+of share counts -> treat ±5%/yr differences between variants as noise).
+
+Reading (honest):
+- 18 variants on one dataset: the best one is flattered by selection. Only conclusions that hold
+  across several variants are trusted:
+  - **Market filter "block new buys"** helps in both W50 and M50 (higher return, check 2024+
+    better, 1y losing windows 30% -> 20% for W50). "Sell everything" on the filter hurts (whipsaw).
+  - Slower rotation cuts charges (12% -> 3-6%/yr of Rs 20k) but does not reliably raise returns.
+  - Never-sell-at-loss: low returns, 34-40% of capital stuck. Rejected again by data.
+  - Stops/targets: inconsistent between weekly and monthly -> no conclusion.
+- Profit still depends on a few big winners (top 10 trades > 100% of total profit in most
+  variants; the rest roughly break even after charges).
+- Drawdowns of 32-56% in every variant vs 19% for the index. The owner says fear/greed is their
+  weak spot -> sizing / ETF core must be decided before Gate 1.
+
+### 9. Robustness of "W50 + filter" + core/satellite (2026-11-27, `python -m trader robust`)
+One change at a time from the base (combo, weekly, exit out of top 50, no new buys below the
+200-day average, 5 stocks, Rs 20k, point-in-time top 500). Nifty 500: 13% full, 7.7% check.
+
+| variant | Rs 20k -> | full | random | learn 21-23 | check 24+ | random 24+ | max DD | 3y beat N500 | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|---|---|
+| base | 1.74 L | 44% | 19% | 78% | 11% | 0% | −36% | 100% | 80% |
+| exit 30 / 40 / 75 | 1.34 / 0.86 / 1.55 L | 38 / 28 / 42% | | 52 / 46 / 51% | 19 / 12 / 32% | | −33 / −42 / −42% | 100 / 100 / 50% | 85 / 90 / 70% |
+| filter 150d / 250d / none | 1.35 / 1.41 / 1.35 L | 38 / 39 / 38% | | 84 / 77 / 78% | 1 / 8 / 1% | | −35 / −42 / −44% | 100 / 92 / 92% | 60 / 80 / 75% |
+| 4 / 3 positions | 2.20 / 1.46 L | 50 / 40% | | 85 / 89% | 16 / 14% | | −37 / −57% | 100 / 83% | 80 / 90% |
+| decide Wednesday | 1.47 L | 40% | 8% | 50% | 26% | 4% | −43% | 100% | 55% |
+| top 200 only (large) | 1.13 L | 34% | 13% | 38% | 28% | 10% | −33% | 100% | 45% |
+| ranks 201-500 (mid/small) | 0.81 L | 27% | 15% | 57% | 1% | 2% | −35% | 83% | 75% |
+| base at Rs 1 lakh | 9.35 L | 46% | 19% | 80% | 21% | 7% | −35% | 100% | 80% |
+
+Core + satellite: w in the strategy, rest in a Nifty 500 ETF (0.2%/yr fee), reset each January.
+Strategy part simulated at its own (smaller) capital. Window figures sliced from one path.
+
+| total | strategy share | final | full | 2024+ | max DD | 1y windows losing | worst 1y | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|---|
+| any | 0% (ETF only) | 2.07x | 13% | 7% | −19% | 35% | −6% | 0% |
+| Rs 20k | 25% | too small (Rs 1k per stock) | | | | | | |
+| Rs 20k | 50% | Rs 82k | 27% | 11% | −27% | 25% | −15% | 15% |
+| Rs 20k | 100% | Rs 1.74 L | 44% | 16% | −36% | 25% | −19% | 85% |
+| Rs 1 L | 25% | Rs 3.24 L | 22% | 10% | −21% | 20% | −8% | 0% |
+| Rs 1 L | 50% | Rs 4.86 L | 31% | 13% | −26% | 20% | −10% | 15% |
+| Rs 1 L | 75% | Rs 6.89 L | 39% | 15% | −29% | 25% | −14% | 70% |
+
+Reading (honest):
+- **Plateau, not a peak, over the full period**: every neighbour beats random and the index
+  (27-50%/yr). But 2021-23 (a strong momentum market) carries it: learn 38-89%, check 2024+ only
+  1-32% (median ~14% vs index 7.7%, random ~0-4%). The edge survived out of sample but is much
+  smaller and very noisy. Plan on roughly index +5%/yr, with long dull stretches.
+- **The market filter is weaker evidence than Results 8 suggested**: 150-day filter = no filter in
+  2024+ (1%); 200 days looks good partly by luck. Keep it (cheap, helps over the full period) but
+  don't count on it.
+- Positions: 4 vs 5 within noise; 3 is clearly worse (−57%). Keep 5.
+- Large caps (top 200) held up best in 2024+ (28%, random 10%) with lower charges (2%/yr) and
+  fewer deep falls; mid/small did worst. Picked after seeing data -> paper-track alongside, don't switch.
+- **Owner's limit (25% fall)**: the strategy alone breaks it in 80% of 1-year windows. Mixes that
+  roughly fit: Rs 1 L with 25% strategy (−21%, never >25%) or 50% (−26%, 15% of years);
+  Rs 20k 50/50 (−27%). Rs 20k with 25% is impossible (positions too small for the charges).
+
+### 10. Exits as standing orders on the day's high/low (2026-11-27, `python -m trader exits`)
+Owner's point: a real target/stop order (Zerodha GTT) fills when the price touches it during the
+day, so Results 8 (close-checked) was unfair to targets. The bhavcopy has every day's high and low
+(all 3.2M EQ rows 2020-26 valid), so `simulate(intraday=(H, L))` now fills targets at the target
+(or a higher open) and stops at the stop (or a lower open, minus slippage) from the day after the
+buy; both touched the same day -> stop assumed first (intraday order unknowable from daily data).
+Entry = Gate 1 rule (combo weekly, 200d filter, 5 stocks, Rs 20k); only the exit differs.
+Nifty 500: 13% full, 7.7% check.
+
+| exit | Rs 20k -> | full | random | check 24+ | max DD | win rate | money stuck >60d underwater | 3y beat N500 |
+|---|---|---|---|---|---|---|---|---|
+| **rank exit (top 50) - Gate 1 rule** | **1.74 L** | **44%** | 19% | 11% | −36% | 47% | 4% | 100% |
+| rank + stop, intraday | 1.65 L | 43% | 17% | 8% | −37% | 47% | 3% | 100% |
+| rank + target 15%, intraday | 0.89 L | 29% | 4% | −8% | −32% | 59% | 6% | 75% |
+| rank + target 25%, intraday | 0.75 L | 25% | 6% | 20% | −38% | 48% | 5% | 92% |
+| target 10% + stop, close / intraday | 0.40 / 0.25 L | 13 / 4% | | 5 / −10% | −41 / −50% | 74% | 23 / 14% | 58 / 8% |
+| target 15% + stop, close / intraday | 0.43 / 0.46 L | 14 / 15% | | 7 / 2% | −44 / −36% | 67-71% | 15-18% | 83 / 75% |
+| target 20% + stop, intraday | 0.72 L | 24% | 5% | 16% | −28% | 70% | 16% | 83% |
+| never-sell-at-loss + target 5%, intraday | 0.18 L | −2% | 8% | −4% | −53% | 100% | 45% | 0% |
+| never-sell-at-loss + target 10%, intraday | 0.13 L | −7% | 9% | −3% | −61% | 100% | 51% | 0% |
+| never-sell-at-loss + rank + target 10%, intraday | 0.20 L | 0% | 9% | −2% | −50% | 100% | 51% | 17% |
+
+Reading:
+- Intraday fills make targets fire more often, but also stops (lows touch them more often than
+  closes) - net, targets+stops do not improve; capping winners is what hurts: momentum profit
+  comes from a few big winners (top 10 trades > 100% of profit with the rank exit).
+- Never-sell-at-loss: every closed trade is a winner (100% win rate) but half the money sits in
+  losers that never come back; all 5 slots end underwater; worse than random and the index.
+  Rejected for the 4th time, now with the fairer intraday targets.
+- Keep the Gate 1 rule (rank exit, no target). A volatility stop is neutral (−1%/yr, same DD).
+
+### 11. Out of sample 2006-2019 (2026-11-27, `python -m trader history fetch` + `longrun`)
+Owner's concern: 2021-2026 is mostly a bull market. Old NSE bhavcopies (2005-2019, 3,700 days,
+5.06M rows incl. later-dead stocks) in data/history.db on the PC; same rules, nothing re-tuned.
+Universe thinner early (eligible 158/week in 2006 -> 383 in 2019: nominal Rs 2 cr turnover floor).
+Nifty 500 Jul 2006 -> 2019: 10.5%/yr, worst fall −64% (2008).
+
+| variant (Rs 25k alone) | Rs 25k -> | per yr | random | worst fall | 1y windows losing | 3y beat random / N500 | worst 3y |
+|---|---|---|---|---|---|---|---|
+| **Gate 1 rule (W50 + 200d filter)** | 1.41 L | **14%** | 10% | **−78%** | 26% | 74% / 69% | −14%/yr |
+| W50, no filter | 1.06 L | 11% | 5% | −73% | 40% | 71% / 55% | −22%/yr |
+| W20, no filter (Results 7) | 0.71 L | 8% | 2% | −73% | 46% | 83% / 45% | −20%/yr |
+| top 200 only + filter | 0.78 L | 9% | 8% | −85% | 38% | 76% / 60% | −7%/yr |
+75/25 mix on Rs 1 lakh (Gate 1 rule + Nifty 500): Rs 4.56 L, 12.0%/yr vs index 10.5%, worst fall −68%.
+
+By year (Nifty 500 / strategy / 75-25 mix): 2007 +61/+99/+70, **2008 −57/−72/−61**, 2009 +89/+108/+93,
+2010 +13/−14/+6, 2011 −28/+6/−19, 2013 +3/−14/−2, 2014 +38/+132/+61, 2016 +3/−2/+2,
+**2018 −3/−38/−12** (mid/small crash: strategy −41% vs index −14%).
+
+Reading (honest):
+- The edge survives out of sample but is SMALL: ~+3.5%/yr over the index before tax (14 vs 10.5),
+  not the 44% of 2021-26. After 20% STCG on the strategy part vs 12.5% LTCG on an index fund the
+  after-tax gap is roughly +1.5-2%/yr. The 75/25 mix: +1.5%/yr over the index.
+- Market filter (block new buys) helped again (14% vs 11%, fewer losing years) - now supported on
+  two separate periods. W20 and "top 200 only" were worse here -> keep the Gate 1 rule as is.
+- Crashes: the filter does NOT protect holdings already bought. 2008: strategy −78%, index −64%,
+  75/25 mix −68%. The owner's 25% pain limit is broken by the index itself in 2008 (−64%) and
+  2010-11 (−32%): with 100% in equities no mix keeps falls under 25% in a real crash.
+- Next to test (owner to decide): protect the WHOLE portfolio in crashes - e.g. hold the index
+  fund only while Nifty 500 > 200-day average (else a liquid/debt fund), and/or sell the
+  strategy stocks when the filter turns off (whipsaw cost in 2021-26, Results 8, vs crash saving).
+
+### 12. Crash protection for the whole portfolio, 2006-2026 (2026-11-27, `python -m trader protect`)
+history.db + market.db as one panel (5,414 sessions, 3,174 split/bonus events). Rs 1 lakh, Jul 2006
+-> Nov 2026, before tax. "Timed" index fund = hold Nifty 500 only while it is above its 200-day
+average (checked Fridays, switch Monday close, 0.1%/switch), else a liquid fund at 6%/yr.
+"Sell all" = strategy sells every stock when the filter turns off (vs "block" = only stop buying).
+
+| portfolio | Rs 1 L -> | per yr | 2006-19 | 2021-26 | worst fall | worst 1y | 1y windows falling >25% |
+|---|---|---|---|---|---|---|---|
+| index fund, always | 9.3 L | 12% | 11% | 13% | −64% | −57% | 18% |
+| **index fund, timed** | 9.2 L | 12% | 12% | 8% | **−29%** | −24% | 5% |
+| strategy alone (block) | 165 L | 29% | 15% | 49% | −78% | −72% | 65% |
+| strategy alone (sell all) | 58 L | 22% | 16% | 24% | −50% | −39% | 44% |
+| 75 always + 25 block (Gate 1 now) | 25.3 L | 17% | 12% | 24% | −68% | −61% | 18% |
+| 75 timed + 25 block | 26.5 L | 17% | 14% | 19% | −40% | −36% | 5% |
+| **75 timed + 25 sell all** | 17.4 L | 15% | 14% | 13% | **−29%** | −25% | 5% |
+
+Worst fall inside each market fall (index / timed index / 75-25 now / 75 timed + 25 sell-all):
+2008 −64/−28/−68/−29; 2010-11 −32/−13/−27/−19; 2018 −16/−11/−21/−18; Covid 2020 −38/−9/−36/−8;
+2024-25 −19/−13/−20/−12.
+
+Reading:
+- The 200-day rule on the index fund kept the same 20-year return (12%) with less than half the
+  worst fall (−29% vs −64%). Cost: whipsaws (~3 switches/yr, more small losing years: 8 vs 4) and
+  lagging in strong bull runs (2021-26: 8% vs 13%). Each switch out is a taxable sale (not
+  modelled; roughly −0.5 to −1%/yr) and the 6% liquid-fund rate is an assumption.
+- "75 timed + 25 sell all" is the only mix near the owner's 25% limit in every crash (worst −29%,
+  2008) at ~+3%/yr over the index (15 vs 12). The more aggressive "75 timed + 25 block" earns more
+  (17%) with −40% in 2008.
+- 2021-26 numbers flatter the strategy (period used for design); 2006-19 is the cleaner guide:
+  index 11%, timed 12%, 75 timed + 25 strategy 14%.
+
+### 13. "Weekly winners" model (2026-11-27, `python -m trader winners`)
+Owner's design: decide Friday close, buy Monday open; +5% target / −5% stop checked from Tuesday
+only (buy-day high never counts; both touched same day -> stop); else sell Friday close. Rs 5k per
+stock, all charges (~0.6-0.7% per round trip incl. slippage). Time split: train 2006-16, tune
+2017-19, TEST 2020-26 (once). 397k stock-weeks, point-in-time top 500. Base rate of "+5% before
+−5%": 26-33%. Models: logistic regression and gradient boosting on 16 price/volume features.
+
+| top 5 each week | train 2006-16 avg trade / CAGR | tune 2017-19 | TEST 2020-26 | target hit (test) | stop hit (test) |
+|---|---|---|---|---|---|
+| gradient boosting | +0.09% / 1% | −0.59% / −29% | −0.46% / −23% | 42% | 41% |
+| logistic regression | −0.76% / −36% | −1.50% / −56% | −0.91% / −40% | 39% | 49% |
+| momentum combo top 5 | −0.40% / −21% | −0.83% / −36% | −0.33% / −18% | 41% | 40% |
+| 5 random stocks | −0.55% / −27% | −0.87% / −38% | −0.59% / −28% | 29% | 28% |
+| Nifty 500 (same weeks) | +0.28% / 13% | +0.22% / 11% | +0.29% / 14% | | |
+
+Reading: the models DO find stocks that hit +5% more often (AUC ~0.61, target hit 42% vs 29%
+random) - but those are simply more volatile stocks (top weights: volatility, distance from the
+200-day average) and hit −5% just as often. Gross edge over random ~+0.1-0.2%/trade is far below
+the ~0.65% round-trip cost of a weekly Rs 5k trade. Every weekly-trading variant loses money after
+charges in every period; the index gains. Weekly 5% swing trading on daily data: rejected.
+
+### 14. News categories, weekly-winner exits, and "hold losers" on model picks (2026-11-27)
+**News (`news fetch` + `news baseline`):** 26,666 NSE announcements 2019-2026 for a shortlist of
+today's top-50 momentum stocks (data/news.db, PC). Measured from the next tradable open, 20-day
+return vs Nifty 500, compared with the SAME stock's ordinary days (the shortlist beats the index on
+any day: +1.2% 2019-23, +3.2% 2024+ per 20 days - shortlist bias). Only 1 of 41 NSE categories
+holds in both periods with |t| > 2: "Disclosure under SEBI Takeover Regulations" (+2.3% / +1.8%;
+buy and sell disclosures mixed). Results announcements: no consistent effect. -> NSE category
+labels alone add little; the text (results beat/miss, promoter buy/sell) would need an LLM and can
+only be tested going forward (hindsight leak) - announcements collected on the Pi since 2026-11.
+
+**Weekly winners, other exits (`winners-exits`):** same model picks, buy Monday open, sold by
+Friday close: +5%/−5%, +5%/−10%, +5%/no stop, no target/no stop - all lose 0.4-1.0% per trade
+after charges in every period (index +0.2-0.3%/week). The −5% stop had been added by me, not the
+owner; removing it does not change the conclusion for a one-week hold.
+
+**Owner's rule on model picks (`winners-hold`):** sell only when the day's high reaches +5% (or
++10%) after charges, never at a loss, no time limit, 5 slots (Rs 25k):
+
+| period | model +5% | momentum +5% | random +5% | model +10% | random +10% | Nifty 500 |
+|---|---|---|---|---|---|---|
+| train 2006-16 | 3% (DD −54%) | 5% (−66%) | 3% (−59%) | 3% (−47%) | 10% (−56%) | 10% |
+| tune 2017-19 | −11% (−53%) | −2% (−40%) | −8% (−40%) | −14% (−57%) | 1% (−42%) | 12% |
+| TEST 2020-26 | 2% (−48%) | 5% (−51%) | 8% (−46%) | 10% (−54%) | 9% (−29%) | 14% |
+Every variant: ~100% of sold trades are winners, 25-55% of the money stuck in losers, all 5 slots
+under water at the end of every period. Model picks are no better than random under this rule.
+Never-sell-at-loss rejected for the 5th time (20 years, model picks, intraday targets, time split).
+
+### 15. Staggered entry (2026-11-27, `python -m trader stagger`)
+Owner's idea: fill slots one at a time, only the strongest picks. Gate 1 rule, 2006-2026, Rs 25k.
+| variant | per yr full | random (same limits) | 2006-19 | 2020-26 | worst fall | avg cash |
+|---|---|---|---|---|---|---|
+| fill all 5 (Gate 1 rule) | 29% | 6% | 15% | 59% | −78% | 2% |
+| 1 new stock per week | 27% | 4% | 15% | 44% | −70% | 6% |
+| 2 new per week | 28% | 10% | 15% | 54% | −78% | 2% |
+| 1 per week, top 3 only | 27% | 19% | 15% | 43% | −68% | 7% |
+| 1 per week, only the #1 | 22% | 21% | 14% | 29% | −57% | 18% |
+Reading: staggering does not help; being in the top ~5 of the ranking is what matters (random
+picks among the top 3-5 also do well), the exact order inside the top few does not. -> effort
+belongs in better SELECTION, which the owner also concluded.
+
+## DECISION 2026-11-27 (later): forward-only, judged on paper trading
+Owner: stop using old data; collect what is available from today, refine the selection algorithm
+on paper until it is statistically better. Target: **18%/yr after tax** (~22-23%/yr before 20%
+STCG, after charges). Pass rule agreed in principle: beats Nifty 500 AND random picks after tax
+over >= ~150 paper trades (realistically 12-18 months; 2-3 months can be luck). Every change to a
+rule restarts its count. The F&O history download was stopped (fno.db partial, unused).
+Forward data on the Pi (market.db), from 2026-11-27:
+  - existing: bhavcopy + delivery, deals, FII/DII, NSE announcements RSS, hourly bars (Yahoo)
+  - `collect extra` (timer weekdays 20:10, Sat 10:30): fno_daily (futures/options OI + volume per
+    underlying, ~224/day), filings (latest quarterly results 3,816 + shareholding 2,378, raw JSON),
+    levers (S&P 500, Brent, USD/INR, gold, US 10y, India VIX, Nifty, Nifty 500)
+  - hourly news job now also stores business news RSS: ET Markets, Moneycontrol, Livemint, PIB
+  - NOT available: NSE insider-trading (PIT) API empty after early May 2026 (use announcements)
+Paper trading: first decision Friday 2026-11-27 (5 buys pending per book for Monday's open).
+Next: define selection ideas on the forward data as separate paper books (options OI build-up /
+put-call, SAST/insider announcements, results surprise from filings, lever tailwind, news tags
+once Gemini key exists), weekly Telegram comparison vs index, random and the momentum baseline.
+
+## RESEARCH PLAN (agreed 2026-11-27): 2-3 months on stock selection, nothing else
+Owner's style: event/lever-driven trades of weeks; selection = trigger + confirmation + filters.
+Owner's trigger ideas: news/events, levers (crude, INR, rates), options activity (volumes, put/call,
+OI build-up), major sector news, taxes/policy, scams. Exits/holding come after selection is solid.
+Data availability checked 2026-11-27 (NSE, free): F&O bhavcopy (options+futures, OI, volume) at
+least 2012+; insider/PIT trades with buy/sell/mode 2019+; quarterly results per company many
+years; shareholding pattern ~5 years; bulk-deal history endpoint returned 503. No archive for
+sector/tax/scam news: hand-built calendar (Budget, GST Council, RBI) + scam list; GDELT (free
+news DB, 2015+) to evaluate; forward news/PIB headlines on the Pi with Gemini tagging.
+  Weeks 1-2: build data (F&O first), event calendar, scam list.
+  Weeks 3-6: test each signal alone (vs same stock's ordinary days, learn old / check new).
+  Weeks 7-9: combine survivors into one selection score (time-split model) vs momentum/random.
+  Weeks 10-12: Pi computes the score weekly and paper-trades it next to the current books.
+
+### 16. Last night's S&P 500 vs the Indian day (2026-11-27, `python -m trader overnight`)
+5,165 NSE days 2006-2026, average point-in-time top-200 stock, by the previous US session's move:
+| S&P 500 last night | days | opening gap | open -> close | open -> 1 week |
+|---|---|---|---|---|
+| below −2% | 215 | −1.22% | +0.28% | −0.11% |
+| −2 to −1% | 417 | −0.31% | −0.15% | −0.30% |
+| flat | 1750 | +0.23% | −0.12% | +0.19% |
+| +1 to +2% | 545 | +0.67% | −0.24% | +0.16% |
+| above +2% | 163 | +1.26% | −0.43% | −0.20% |
+Same pattern in 2006-15 and 2016-26. Reading: the US move sets the OPENING GAP (already in the
+price before anyone can buy at 09:15); after the open there is a small reversal (big US fall ->
++0.3% recovery; big US rise -> −0.4% fade), smaller than one trade's ~0.65% cost; no weekly edge.
+Use only as an entry nudge: avoid chasing a big gap-up open, gap-down opens after a US sell-off
+are slightly better entries. Also: open -> close is negative on average (−0.1 to −0.2%) - buying
+later in the day than the open may be marginally cheaper (to test with the simulator).
+
+### 17. Popular swing strategies and "best of all worlds" (2026-11-27, `python -m trader strategies [--stage 2]`)
+Owner asked to study published strategies (books, Reddit, Indian setups) and combine the best.
+One daily engine (trader/strategies.py): point-in-time top 500, 5 slots, Rs 25k, all charges,
+decide at close / fill next open. Learn 2006-16, tune 2017-19, TEST 2020-26. Per year (worst fall):
+
+| strategy (with market filter) | learn 2006-16 | tune 2017-19 | TEST 2020-26 | trades/yr | win rate | avg win / loss |
+|---|---|---|---|---|---|---|
+| **Minervini trend template + breakout** | **+19%** (−42%) | +11% (−54%) | **+30%** (−56%) | 23-28 | 30-34% | +31-35% / −8% |
+| Supertrend(10,3) flip | +12% (−38%) | +9% (−40%) | +25% (−26%) | 17-24 | 39-43% | +26% / −11% |
+| golden cross 50/200 | +13% (−40%) | +16% (−18%) | +5% (−44%) | 5-7 | 35-42% | +60-89% / −14-21% |
+| 52-week-high breakout on volume | +13% (−40%) | +5% (−39%) | +8% (−55%) | 20-22 | 38-44% | +23% / −10% |
+| 20-EMA pullback | +12% (−45%) | −6% | −4% | 113 | 38% | +10% / −6% |
+| Connors RSI(2) | −11% | −4% | +10% | 119 | 54% | +3.5% / −5% |
+| NR7 squeeze breakout | 0% | −11% | 0% | 134 | 39% | +8% / −6% |
+| momentum combo (Gate 1) | +17% (−78%) | −1% (−55%) | +59% (−35%) | 16 | 45% | +38% / −15% |
+| **MULTI-BOOK** (momentum, minervini, supertrend, golden, breakout52; equal money) | +15% (−45%) | +8% (−38%) | **+35% (−27%)** | | | |
+| confluence (all must agree) | +22% (−37%) | −4% (−51%) | +3% (−57%) | 25 | 40% | +27% / −8% |
+| Nifty 500 | +10% (−64%) | +12% (−16%) | +14% (−38%) | | | |
+Without the market filter nearly every strategy is worse (filter helps for the 3rd time).
+
+Reading:
+- Trend-following with few, long trades works; short-hold strategies (RSI2, EMA20, NR7) lose to
+  charges even with a 54% win rate. Winners all: 30-45% win rate, wins 3-4x the losses.
+- Minervini alone is the most consistent single strategy (beats the index in all three periods).
+- "Confluence" (best learn result, 22%) collapsed in tune/test: requiring everything to agree
+  overfits - rejected. The diversified MULTI-BOOK is the better "best of all worlds": beats the
+  index in learn and test with the smallest test drawdown (−27%), lags in 2017-19 like most.
+- Against the 18% after-tax target (~22-23% pre-tax): only 2020-26 clears it (Minervini 30%,
+  multi-book 35%); 2006-19 gives 11-19% pre-tax. Drawdowns 38-56% remain -> keep the 75/25 split
+  with the timed index fund (Results 12) for real money.
+Next (proposed): forward paper books on the Pi for minervini, supertrend, golden, breakout52 and
+the multi-book view, next to the running momentum books; weekly Telegram comparison.
+
+### 18. Money size and SIP: Rs 25k vs Rs 1 lakh vs Rs 50k/month (2026-11-28, `python -m trader capital`)
+Owner asked to test with Rs 1 lakh (and a Rs 50k/month SIP) instead of Rs 25k - on paper only, no
+real money. New engine `capital_study.run_pool`: several strategies in ONE account, each position
+exits by its own strategy's rules; buys capped at 2% of 20-day median turnover. Market filter on.
+SIP returns are XIRR on the rupees paid in (first trading day of each month).
+
+| per year (worst fall) | learn 2006-16 | tune 2017-19 | TEST 2020-26 |
+|---|---|---|---|
+| **Rs 1L lump** Minervini | +20% (−42%) | +13% (−52%) | +30% (−62%) |
+| Rs 1L momentum (Gate 1 as signals) | +22% (−48%) | +7% (−48%) | +55% (−38%) |
+| Rs 1L pool momentum+Minervini, 5 stocks | +17% | +5% (−60%) | +41% (−30%) |
+| Rs 1L pool all 5 strategies, 5 stocks shared | +10% | +12% | +30% (−36%) |
+| Rs 1L pool, 1 stock per strategy | +18% | −8% | +21% |
+| Rs 1L multi-book 5 x 5 (up to 25 stocks) | +16% (−38%) | +9% (−39%) | +31% (−26%) |
+| Nifty 500 fund | +10% (−64%) | +12% (−16%) | +14% (−38%) |
+| **SIP Rs 50k/month** (XIRR) multi-book 5x5 | +14% | −1% | +24% |
+| SIP Minervini | +10% | −3% | +30% |
+| SIP momentum | +15% | −5% | +43% |
+| SIP Nifty 500 fund | +9% | +6% | +13% |
+
+- Rs 25k and Rs 1 lakh give almost the same % (charges slightly lower at 1 lakh). Size is not the
+  issue; Rs 1 lakh just makes rupee numbers meaningful and lets 5 strategies fit.
+- Squeezing 5 strategies into 5 shared slots loses most of the diversification benefit; only the
+  separate-books version (up to 25 stocks) keeps the smoother ride - that breaks the owner's
+  "max 5 positions" rule, so it is the owner's call.
+- SIP: in 2017-19 every strategy lost money on the rupees paid in while the index SIP made +6%;
+  2020-26 SIP Rs 41.5 L -> index Rs 64 L, multi-book Rs 97 L, Minervini Rs 120 L, momentum Rs 181 L
+  (before 20% STCG; survivorship-free universe but strategy rules chosen with hindsight of popularity).
+
+## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
+
+`python -m trader collect daily|news|backfill|status` → `data/market.db` (SQLite):
+- `eq_daily`: full bhavcopy incl. **delivery %** (Nifty 500 + all NSE ETFs, ~860 symbols/day).
+  Archive available back to at least 2020 → backfill with `collect backfill --start 2020-01-01` (~1 h).
+- `deals`: bulk + block deals (current file only → collect daily from now).
+- `fii_dii`: FII/DII cash flows (API gives only today → collect daily from now).
+- `announcements`: NSE announcements + results RSS hourly, company → symbol match ~78%
+  (unmatched are mostly SME/debt issuers).
+- Holidays detected (NSE republishes the previous file); catch-up of last 10 weekdays each run.
+- systemd user timers: daily Mon-Fri 19:30 IST + Sat 10:00 catch-up; news hourly 07:00-23:00 IST.
+
+## Rebuild the Pi (after a reset) — 2026-11-26
+
+The Pi was reset on 2026-11-26: its `data/market.db` (backfill in progress + ~1 day of FII/DII,
+deals, news) was lost. Code/config/notes are all in GitHub. Prices + delivery are re-downloadable;
+FII/DII, deals and news are not (only from the day they are collected), so get the timers back fast.
+
+1. **OS:** Raspberry Pi OS **64-bit** (Lite is fine), SSH enabled, same username as before if possible.
+2. **Deploy key** (lets the Pi push to this repo only). On the Pi:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/github_sma -N "" -C "pi-stock-market-analyzer"
+   cat >> ~/.ssh/config <<'EOF'
+   Host github-sma
+       HostName github.com
+       User git
+       IdentityFile ~/.ssh/github_sma
+       IdentitiesOnly yes
+   EOF
+   chmod 600 ~/.ssh/config
+   cat ~/.ssh/github_sma.pub
+   ```
+   On GitHub: repo → Settings → Deploy keys → **delete the old Pi key** (its private half is gone
+   with the old SD card/stick) → Add deploy key → paste, tick **Allow write access**.
+   Test: `ssh -T github-sma` → "successfully authenticated".
+3. **Everything else, one command** (idempotent; clones if needed, venv, tests, first collection, timers):
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/bhushan318/stock-market-analyzer/swing-engine/deploy/setup_pi.sh -o setup_pi.sh
+   less setup_pi.sh        # read it before running
+   bash setup_pi.sh
+   ```
+4. **Data on the external disk + PC merge + backfill, one command.** The Pi now has a 1.4 TB
+   external HDD (exFAT, label "Bhushan", mounted at `/mnt/ehd`, shared with other files). SQLite
+   is safest on ext4, so `deploy/move_data_to_ehd.sh` makes a 10 GB ext4 image
+   `/mnt/ehd/pi-data/sma.img`, loop-mounts it at `/mnt/sma` (fstab, nofail), moves `data/` to
+   `/mnt/sma/sma-data` and leaves `data` as a symlink (disk missing → collectors fail loudly,
+   never fill the flash). If `~/pc_market.db` exists it merges its news/deals/FII-DII
+   (INSERT OR IGNORE — never scp the PC DB over the Pi's: that would wipe Pi data).
+   Then it starts the backfill in tmux (log: `data/backfill.log`).
+   ```bash
+   # on the PC (optional, older news 2026-11-03..25): scp data/market.db bhushan@<pi-ip>:~/pc_market.db
+   cd ~/stock-market-analyzer && git pull && bash deploy/move_data_to_ehd.sh
+   ```
+5. **Backfill** (~3 h, resumes if interrupted; weekend special sessions afterwards) — started by step 4.
+6. `.env` with `GEMINI_API_KEY` when created (`chmod 600`).
+7. Claude Code on the Pi: reinstall per Anthropic's docs, log in, start it in `~/stock-market-analyzer`.
+
+Checklist after the reset:
+- [ ] 64-bit OS, SSH
+- [ ] deploy key + `github-sma` alias, old key removed on GitHub
+- [ ] `setup_pi.sh` ran: tests pass (22 on the PC), timers listed
+- [x] `setup_pi.sh` ran on the Pi 2026-11-26: 22 tests pass, 8 days x ~2,950 symbols, timers on
+- [x] PC news/deals/FII-DII merged into the Pi DB (announcements now from 2026-11-03)
+- [x] backfill done 2026-11-26 22:29 IST: 1,714 trading days 2020-01-01 -> 2026-11-26,
+      3,751 symbols, 533 MB, no partial days. DB still on the flash disk (4.3 GB free).
+- [x] hourly news job now also fetches deals + FII/DII (both are "latest day only" and appear
+      after the 19:30 run; 2026-11-26's deals were missed because of this)
+- [ ] external disk: first attempt hung — Seagate Expansion (0bc2:2036) under the UAS driver never
+      completed a cache flush. Fixed with `usb-storage.quirks=0bc2:2036:u` in
+      /boot/firmware/cmdline.txt (backup `cmdline.txt.bak-uas`). `fsck.exfat -n` then found real
+      exFAT damage (cross-linked clusters, a corrupted folder) - likely from the old flush failures.
+      Owner is repairing it on Windows (chkdsk /f). After that: delete `pi-data/sma.img.tmp`,
+      run `deploy/move_data_to_ehd.sh` (needs sudo password) - it moves data/ into the ext4 image.
+      Only ever touch `pi-data/` on that disk; it holds the owner's personal files.
+- [ ] reboot test: `/mnt/sma` mounts by itself
+- [ ] backfill + `--weekends` finished; `collect status` shows ~1,700+ days
+- [ ] Claude Code reinstalled
+- [ ] Gemini key in `.env` (owner, still not created)
+
+Notes kept from the first setup: Python 3.13 on the Pi worked; linger must be on (install.sh does it);
+system disk is a USB flash stick with little free space — keep no extra index on eq_daily (see below);
+expect ~0.7 GB for the all-stocks DB.
+
+## Workflow: PC for research, Pi for collection + live (decided 2026-11-25)
+
+Backtests are ~2,000 full simulations per study - too slow on the Pi. The daily/weekly live run
+(rank today's stocks, 0-4 orders a week) is seconds and stays on the Pi. Data flows Pi -> PC only:
+on the Pi `python -m trader collect export` makes `data/market_snapshot.db.gz` (SQLite online
+backup, safe while collectors write; 69 MB DB -> 28 MB gz); scp it to the PC and unzip to
+`data/market.db`. Live-system risks on the Pi are reliability (reboots, SD card, network), not
+speed: build catch-up checks, retries and failure alerts into Gate 1.
+
+## Point-in-time data (built 2026-11-25, `trader/pit.py`)
+
+- `collect.store_all: true`: every EQ/BE stock (~1,640/day in 2020), not just today's N500.
+- Symbol renames from NSE `symbolchange.csv` (effective-dated, chains resolved).
+- Split/bonus factor = NSE PREV_CLOSE(t) / CLOSE(t-1); only < 0.85 or > 1.18 counts (smaller gaps
+  are missed Saturday sessions, penny-stock ticks, dividends) and only if the previous row is
+  <= 10 days earlier. Dividends are not added back (~1-1.5%/yr lower for rule and random alike).
+- 2026-11-26: backfill crawled (250 -> 25 days/hour, 19 GB written in 11 h) because the Pi's
+  system disk is a USB flash stick and the eq_daily(symbol, date) index made every insert hit
+  ~2,000 scattered pages. Index dropped (nothing reads by symbol; all reads are by date = PK):
+  6 days/min again, and far less flash wear. Keep new indexes off eq_daily unless really needed.
+- NSE served 2022-08-08 as an .xlsx under the .csv name; `nse.bhavcopy_text` now detects that
+  and converts it (stdlib only).
+- Saturday special sessions (budget day 2020-02-01 etc.) caused false 10-12% gaps: backfill
+  `--weekends` fetches them (queued to run automatically after the main backfill).
+- Universe each week = top 500 by 6-month median turnover at that date, price >= Rs 10, ETFs out.
+- Stocks that stop trading > 10 sessions before the end can be exited at their last close
+  (optimistic for collapses; counted in the output).
+- `momentum-pit` also runs the same rules on "today's Nifty 500" over the same data: the gap is
+  the survivorship bias of Results 6. Learn 2021-23, check 2024+ (signals need 12 months).
+- Smoke run on partial data completed end to end (numbers meaningless).
+
+## NEXT: Gate 0 backtests (no LLM needed)
+
+Immediate (Gate 1 running, started 2026-11-27):
+- Owner: create the Telegram bot (BotFather), put TELEGRAM_BOT_TOKEN in the Pi's .env, message
+  the bot, run `python -m trader paper chatid`, add TELEGRAM_CHAT_ID. Then `paper status` to check.
+- Check Monday 2026-11-30 evening: first fills recorded correctly (`paper status`, journal).
+- Gate 1 commands on the Pi: `python -m trader paper init|run|status|chatid`; state in data/paper.db;
+  logs `journalctl --user -u trader-paper`. Real index fund for the 75% core to be chosen before
+  Gate 2 (a Nifty 500 index fund/ETF; paper uses the index minus 0.2%/yr).
+- Review after 3 months (~end Feb 2027): main vs large vs Nifty 500, worst fall, charges, slippage.
+- Results reactions (step 3) once announcements history is long enough (only Nov 2026 so far).
+- Done: robustness (Results 9), turnover/capital/filter/exits (Results 8), split fix (Results 7).
+
+Work on the Pi (studies take minutes; use nohup/tmux). For each signal: rank Nifty 500 stocks
+weekly, form a 5-stock portfolio + measure forward 5/10/20-day returns of the top decile; compare
+with random picks from the same eligible set and with Nifty 500 buy-and-hold; rolling 1y/3y windows;
+learn on 2020-2023, check on 2024-2026. Note survivorship bias in every report.
+
+1. **Momentum / relative strength** — first run done, biased (Results 6); point-in-time redo = `momentum-pit` (written, to run).
+   Original spec: (prices from Yahoo, 2015+): 6- and 12-month return skipping the
+   last month, distance to 52-week high, return vs sector and vs Nifty. Compare with the
+   Nifty 200 Momentum 30 ETF (if the ETF matches, prefer the ETF).
+2. **Delivery %** (from `eq_daily`, 2020+): does rising delivery % on up-days / high delivery vs the
+   stock's own 20-day average predict the next 5-20 days?
+3. **Results reactions**: around result dates (from announcements going forward; for history use
+   big-volume days / NSE results calendar if obtainable) — drift after strong vs weak reactions.
+4. **Lever sensitivities** (`levers`, written, to run): regress each stock's weekly returns on crude (BZ=F), USD/INR (INR=X),
+   gold, India 10y yield proxy, Nifty, sector index; store betas per stock for the lever maps.
+5. Exit-rule comparison on whatever signal survives: never-sell-at-loss vs target + vol stop
+   (track stuck rate).
+
+Then: Phase 2 lever maps (Gemini drafts per sector, owner reviews) → Phase 3 news tagging →
+weekly scoring → Gate 1 paper trading with Telegram alerts (owner OK'd Telegram in principle;
+bot not created yet).
+
+## Known issues / notes
+
+- Yahoo ETF data 2009 has zero opens; NSE ETF early data rough — cleaner handles it.
+- `data/cache` probs cache key = model + label + last date + panel length; delete `data/cache`
+  after changing features or cleaning logic.
+- Universe file `universes/nifty500_2026-11.csv` = constituents as of Nov 2026 (refresh every
+  March/September when NSE rebalances; keep old files for history).
+- The repo is also edited on Windows: `.gitattributes` forces LF for `*.sh`, `*.service`, `*.timer`.

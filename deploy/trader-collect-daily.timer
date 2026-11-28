@@ -1,0 +1,11 @@
+[Unit]
+Description=NSE end-of-day collection: weekdays 19:30 IST, Saturday catch-up
+
+[Timer]
+OnCalendar=Mon..Fri 19:30 Asia/Kolkata
+OnCalendar=Sat 10:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
