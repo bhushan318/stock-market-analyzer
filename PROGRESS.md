@@ -1,6 +1,6 @@
 # PROGRESS.md — decisions, results, next steps
 
-Last updated: 2026-11-27 (Results 17: popular strategies + best-of-all-worlds study).
+Last updated: 2026-11-28 (Results 18: Rs 25k vs 1 lakh vs Rs 50k/month SIP).
 
 ## Where we are
 
@@ -493,6 +493,35 @@ Reading:
   with the timed index fund (Results 12) for real money.
 Next (proposed): forward paper books on the Pi for minervini, supertrend, golden, breakout52 and
 the multi-book view, next to the running momentum books; weekly Telegram comparison.
+
+### 18. Money size and SIP: Rs 25k vs Rs 1 lakh vs Rs 50k/month (2026-11-28, `python -m trader capital`)
+Owner asked to test with Rs 1 lakh (and a Rs 50k/month SIP) instead of Rs 25k - on paper only, no
+real money. New engine `capital_study.run_pool`: several strategies in ONE account, each position
+exits by its own strategy's rules; buys capped at 2% of 20-day median turnover. Market filter on.
+SIP returns are XIRR on the rupees paid in (first trading day of each month).
+
+| per year (worst fall) | learn 2006-16 | tune 2017-19 | TEST 2020-26 |
+|---|---|---|---|
+| **Rs 1L lump** Minervini | +20% (−42%) | +13% (−52%) | +30% (−62%) |
+| Rs 1L momentum (Gate 1 as signals) | +22% (−48%) | +7% (−48%) | +55% (−38%) |
+| Rs 1L pool momentum+Minervini, 5 stocks | +17% | +5% (−60%) | +41% (−30%) |
+| Rs 1L pool all 5 strategies, 5 stocks shared | +10% | +12% | +30% (−36%) |
+| Rs 1L pool, 1 stock per strategy | +18% | −8% | +21% |
+| Rs 1L multi-book 5 x 5 (up to 25 stocks) | +16% (−38%) | +9% (−39%) | +31% (−26%) |
+| Nifty 500 fund | +10% (−64%) | +12% (−16%) | +14% (−38%) |
+| **SIP Rs 50k/month** (XIRR) multi-book 5x5 | +14% | −1% | +24% |
+| SIP Minervini | +10% | −3% | +30% |
+| SIP momentum | +15% | −5% | +43% |
+| SIP Nifty 500 fund | +9% | +6% | +13% |
+
+- Rs 25k and Rs 1 lakh give almost the same % (charges slightly lower at 1 lakh). Size is not the
+  issue; Rs 1 lakh just makes rupee numbers meaningful and lets 5 strategies fit.
+- Squeezing 5 strategies into 5 shared slots loses most of the diversification benefit; only the
+  separate-books version (up to 25 stocks) keeps the smoother ride - that breaks the owner's
+  "max 5 positions" rule, so it is the owner's call.
+- SIP: in 2017-19 every strategy lost money on the rupees paid in while the index SIP made +6%;
+  2020-26 SIP Rs 41.5 L -> index Rs 64 L, multi-book Rs 97 L, Minervini Rs 120 L, momentum Rs 181 L
+  (before 20% STCG; survivorship-free universe but strategy rules chosen with hindsight of popularity).
 
 ## Phase 1: data collectors (done, tested on live NSE data 2026-11-25)
 
